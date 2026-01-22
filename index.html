@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Cropper V6.5 - Fixed Ctrl+C</title>
+    <title>Pro Cropper V6.6 - Precise Control</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <style>
         :root { 
@@ -30,7 +30,11 @@
         .img-container { width: 100%; height: 100%; display: none; }
         
         #videoSource { display: none; }
-        .video-controls { width: 100%; padding: 0 40px 10px 40px; display: none; flex-direction: column; gap: 5px; box-sizing: border-box; }
+        .video-controls { width: 100%; padding: 0 40px 10px 40px; display: none; flex-direction: column; gap: 10px; box-sizing: border-box; }
+        .frame-btns { display: flex; gap: 10px; justify-content: center; align-items: center; }
+        .btn-frame { background: #181818; color: var(--accent); border: 1px solid #222; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-family: 'JetBrains Mono'; font-size: 12px; }
+        .btn-frame:hover { background: var(--accent-dim); }
+        
         input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; height: 4px; }
         .time-info { font-size: 11px; color: var(--accent); font-family: 'JetBrains Mono'; text-align: center; }
 
@@ -59,7 +63,7 @@
                     <svg id="lockIcon" viewBox="0 0 24 24"><path id="lockPath" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM9 8V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9z"/></svg>
                 </button>
                 <input type="number" id="aspH" value="1" step="0.1">
-                <button class="btn-tool" id="swapRatioBtn">⇄</button>
+                <button class="btn-tool" id="swapRatioBtn" title="Swap Width/Height">⇄</button>
             </div>
         </div>
         <div class="input-group">
@@ -81,8 +85,14 @@
     </div>
 
     <div class="video-controls" id="videoUI">
+        <div class="frame-btns">
+            <button class="btn-frame" onclick="stepFrame(-10)">-10</button>
+            <button class="btn-frame" onclick="stepFrame(-1)">PREV</button>
+            <div class="time-info" id="timeDisplay">00:00.000</div>
+            <button class="btn-frame" onclick="stepFrame(1)">NEXT</button>
+            <button class="btn-frame" onclick="stepFrame(10)">+10</button>
+        </div>
         <input type="range" id="timeline" step="0.001" value="0">
-        <div class="time-info" id="timeDisplay">00:00.000</div>
     </div>
 
     <div class="actions">
@@ -104,48 +114,82 @@
           snapBtn = document.getElementById('snapBtn');
 
     let cropper, isSnap16 = false, isRatioLocked = true, internalUpdate = false;
+    let fps = 30; // 預設 30 fps，用於精確跳幀
 
-    // --- 核心複製功能 (獨立出來以便按鈕與鍵盤調用) ---
+    // --- 影片跳幀功能 ---
+    function stepFrame(frames) {
+        if (!video.src) return;
+        video.pause();
+        const frameTime = 1 / fps; 
+        video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + (frames * frameTime)));
+        timeline.value = video.currentTime;
+        updateTimeDisplay();
+    }
+
+    function updateTimeDisplay() {
+        timeDisplay.innerText = `${Math.floor(video.currentTime/60).toString().padStart(2,'0')}:${(video.currentTime%60).toFixed(3).padStart(6,'0')}`;
+    }
+
+    // --- 比例交換功能 (優化版：交換尺寸而非單純重置比例) ---
+    function swapDimensions() {
+        if (!cropper) {
+            [aspW.value, aspH.value] = [aspH.value, aspW.value];
+            return;
+        }
+
+        internalUpdate = true;
+        const data = cropper.getData();
+        const canvasData = cropper.getCanvasData();
+        
+        // 交換輸入框數值
+        const oldW = parseFloat(aspW.value);
+        const oldH = parseFloat(aspH.value);
+        aspW.value = oldH;
+        aspH.value = oldW;
+
+        // 計算新比例並套用
+        const newRatio = oldH / oldW;
+        cropper.setAspectRatio(isRatioLocked ? newRatio : NaN);
+
+        // 交換當前裁剪框的寬高
+        cropper.setData({
+            width: data.height,
+            height: data.width,
+            x: data.x + (data.width / 2) - (data.height / 2),
+            y: data.y + (data.height / 2) - (data.width / 2)
+        });
+
+        const newData = cropper.getData();
+        pxW.value = Math.round(newData.width);
+        pxH.value = Math.round(newData.height);
+        
+        internalUpdate = false;
+        if (isSnap16) commitSnap();
+    }
+
     async function copyImg() {
         if (!cropper) return;
-        // 如果 16 倍數開著，在複製前做最後一次彈跳修正
         if (isSnap16) commitSnap();
-        
         cropper.getCroppedCanvas().toBlob(async (blob) => {
             try {
-                await navigator.clipboard.write([
-                    new ClipboardItem({ "image/png": blob })
-                ]);
+                await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
                 showToast("COPIED TO CLIPBOARD");
-            } catch (err) {
-                console.error("Clipboard Error:", err);
-                showToast("FAILED TO COPY");
-            }
+            } catch (err) { showToast("FAILED TO COPY"); }
         }, 'image/png');
     }
 
-// --- 鍵盤監聽器：攔截 Ctrl+C / Cmd+C ---
-// 規則：只放行「數字輸入框」的複製；時間軸(range) 不放行，仍然做裁切複製
-window.addEventListener('keydown', (e) => {
-    const isCopy = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c';
-    if (!isCopy) return;
+    window.addEventListener('keydown', (e) => {
+        const isCopy = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c';
+        if (!isCopy) return;
+        const t = e.target;
+        if (t && t.tagName === 'INPUT') {
+            const type = (t.getAttribute('type') || '').toLowerCase();
+            if (new Set(['text', 'number', 'search', 'email', 'tel', 'url', 'password']).has(type)) return;
+        }
+        e.preventDefault();
+        copyImg();
+    }, true);
 
-    const t = e.target;
-
-    // 只放行「真的需要複製文字/數字」的 input
-    // range(時間軸) 不放行，因為你就是要 Ctrl+C 觸發擷取
-    if (t && t.tagName === 'INPUT') {
-        const type = (t.getAttribute('type') || '').toLowerCase();
-        const allowNativeCopyTypes = new Set(['text', 'number', 'search', 'email', 'tel', 'url', 'password']);
-        if (allowNativeCopyTypes.has(type)) return; // 放行數字框/文字框
-        // type="range" 會走到下面：攔截並 copyImg()
-    }
-
-    e.preventDefault();
-    copyImg();
-}, true); // 用 capture=true，確保更穩地先攔到
-
-    // --- 鎖頭與吸附 UI ---
     function setLockState(locked) {
         isRatioLocked = locked;
         lockBtn.classList.toggle('active', locked);
@@ -154,6 +198,7 @@ window.addEventListener('keydown', (e) => {
             : "M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z");
         if (cropper) cropper.setAspectRatio(locked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN);
     }
+
     lockBtn.onclick = () => setLockState(!isRatioLocked);
     snapBtn.onclick = () => { isSnap16 = !isSnap16; snapBtn.classList.toggle('active', isSnap16); if(isSnap16) commitSnap(); };
 
@@ -167,15 +212,12 @@ window.addEventListener('keydown', (e) => {
             : Math.round(data.height / 16) * 16;
         pxW.value = w; pxH.value = h;
         cropper.setData({ width: w, height: h });
-        if(!isRatioLocked) { aspW.value = (w/h).toFixed(2); aspH.value = 1; }
         internalUpdate = false;
     }
 
-    // --- 雙向同步監聽 ---
     [pxW, pxH].forEach(el => {
-        el.addEventListener('keydown', (e) => { if (e.key === 'Enter') commitSnap(); });
-        el.addEventListener('change', commitSnap);
-        el.addEventListener('input', () => {
+        el.onchange = commitSnap;
+        el.oninput = () => {
             if (internalUpdate || !cropper) return;
             internalUpdate = true;
             setLockState(false);
@@ -184,10 +226,10 @@ window.addEventListener('keydown', (e) => {
             cropper.setAspectRatio(NaN);
             cropper.setData({ width: w, height: h });
             internalUpdate = false;
-        });
+        };
     });
 
-    [aspW, aspH].forEach(el => el.addEventListener('input', () => {
+    [aspW, aspH].forEach(el => el.oninput = () => {
         if (internalUpdate || !cropper) return;
         internalUpdate = true;
         setLockState(true);
@@ -195,7 +237,7 @@ window.addEventListener('keydown', (e) => {
         const data = cropper.getData();
         pxW.value = Math.round(data.width); pxH.value = Math.round(data.height);
         internalUpdate = false;
-    }));
+    });
 
     function initCropper() {
         cropper = new Cropper(image, {
@@ -242,12 +284,12 @@ window.addEventListener('keydown', (e) => {
         setTimeout(() => t.style.display='none', 2000);
     }
 
-    timeline.oninput = () => { video.currentTime = timeline.value; timeDisplay.innerText = `${Math.floor(video.currentTime/60).toString().padStart(2,'0')}:${(video.currentTime%60).toFixed(3).padStart(6,'0')}`; };
+    timeline.oninput = () => { video.currentTime = timeline.value; updateTimeDisplay(); };
     window.addEventListener('paste', (e) => { for (let item of e.clipboardData.items) { if (item.type.includes('image') || item.type.includes('video')) { handleFile(item.getAsFile()); break; } } });
     document.getElementById('copyBtn').onclick = copyImg;
     dropzone.onclick = () => fileInput.click();
     fileInput.onchange = (e) => handleFile(e.target.files[0]);
-    document.getElementById('swapRatioBtn').onclick = () => { [aspW.value, aspH.value] = [aspH.value, aspW.value]; if (cropper && isRatioLocked) cropper.setAspectRatio(parseFloat(aspW.value)/parseFloat(aspH.value)); };
+    document.getElementById('swapRatioBtn').onclick = swapDimensions;
     document.getElementById('dlBtn').onclick = () => {
         if (!cropper) return;
         const a = document.createElement('a'); a.download = `crop_${Date.now()}.png`;
