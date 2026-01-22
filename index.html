@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Cropper V6.6 - Precise Control</title>
+    <title>Pro Cropper V6.7 - UX Optimized</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <style>
         :root { 
@@ -77,7 +77,7 @@
     </div>
 
     <div class="main-stage" id="dropArea">
-        <div id="dropzone"><p>PASTE OR DRAG IMAGE / MP4</p></div>
+        <div id="dropzone"><p>PASTE, DRAG OR DBLCLICK</p></div>
         <div class="img-container" id="imgBox">
             <img id="image">
         </div>
@@ -114,9 +114,8 @@
           snapBtn = document.getElementById('snapBtn');
 
     let cropper, isSnap16 = false, isRatioLocked = true, internalUpdate = false;
-    let fps = 30; // 預設 30 fps，用於精確跳幀
+    let fps = 30; 
 
-    // --- 影片跳幀功能 ---
     function stepFrame(frames) {
         if (!video.src) return;
         video.pause();
@@ -130,39 +129,28 @@
         timeDisplay.innerText = `${Math.floor(video.currentTime/60).toString().padStart(2,'0')}:${(video.currentTime%60).toFixed(3).padStart(6,'0')}`;
     }
 
-    // --- 比例交換功能 (優化版：交換尺寸而非單純重置比例) ---
     function swapDimensions() {
         if (!cropper) {
             [aspW.value, aspH.value] = [aspH.value, aspW.value];
             return;
         }
-
         internalUpdate = true;
         const data = cropper.getData();
-        const canvasData = cropper.getCanvasData();
-        
-        // 交換輸入框數值
         const oldW = parseFloat(aspW.value);
         const oldH = parseFloat(aspH.value);
         aspW.value = oldH;
         aspH.value = oldW;
-
-        // 計算新比例並套用
         const newRatio = oldH / oldW;
         cropper.setAspectRatio(isRatioLocked ? newRatio : NaN);
-
-        // 交換當前裁剪框的寬高
         cropper.setData({
             width: data.height,
             height: data.width,
             x: data.x + (data.width / 2) - (data.height / 2),
             y: data.y + (data.height / 2) - (data.width / 2)
         });
-
         const newData = cropper.getData();
         pxW.value = Math.round(newData.width);
         pxH.value = Math.round(newData.height);
-        
         internalUpdate = false;
         if (isSnap16) commitSnap();
     }
@@ -287,7 +275,10 @@
     timeline.oninput = () => { video.currentTime = timeline.value; updateTimeDisplay(); };
     window.addEventListener('paste', (e) => { for (let item of e.clipboardData.items) { if (item.type.includes('image') || item.type.includes('video')) { handleFile(item.getAsFile()); break; } } });
     document.getElementById('copyBtn').onclick = copyImg;
-    dropzone.onclick = () => fileInput.click();
+    
+    // 修改點：改成雙擊觸發開啟檔案
+    dropzone.ondblclick = () => fileInput.click();
+    
     fileInput.onchange = (e) => handleFile(e.target.files[0]);
     document.getElementById('swapRatioBtn').onclick = swapDimensions;
     document.getElementById('dlBtn').onclick = () => {
