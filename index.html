@@ -3,465 +3,618 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Cropper V6.7 - UX Optimized</title>
+    <title>Pro Cropper V8.0 - Video Mastery & Glass Aesthetics</title>
+    <!-- 引入 Cropper.js 樣式 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
-    :root { 
-        --bg: #020202; 
-        --card-bg: linear-gradient(145deg, #1a1a1a, #0a0a0a);
-        --panel-inset: rgba(0,0,0,0.6);
-        --accent: #00f2ff; 
-        --accent-glow: rgba(0, 242, 255, 0.3);
-        --text: #c0c0c0; 
-        --text-bright: #ffffff;
-        --border-outer: #333;
-        --border-inner: #111;
-    }
-    body { 
-        font-family: 'Inter', system-ui, sans-serif; 
-        background: var(--bg); 
-        background-image: radial-gradient(circle at center, #111 0%, #020202 100%);
-        color: var(--text); 
-        margin: 0; 
-        display: flex; 
-        justify-content: center; 
-        padding: 40px 20px; 
-        min-height: 100vh;
-        box-sizing: border-box;
-    }
+        :root {
+            --depth-base: #020205;
+            --depth-purple: #0f0725;
+            --depth-blue: #050b24;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --accent: #00f2ff;
+            --accent-glow: rgba(0, 242, 255, 0.3);
+            --text: rgba(255, 255, 255, 0.55);
+            --text-bright: #ffffff;
+            --panel-inner: rgba(0, 0, 0, 0.45);
+        }
 
-    .app-container { 
-        width: 100%; 
-        max-width: 1100px; /* 稍微加寬以容納新選單 */
-        background: var(--card-bg); 
-        border-radius: 12px; 
-        border: 1px solid var(--border-outer);
-        box-shadow: 
-            inset 0 1px 1px rgba(255,255,255,0.1), 
-            inset 0 0 20px var(--border-inner), 
-            0 10px 30px rgba(0,0,0,0.8), 
-            0 0 0 1px #000, 
-            0 0 30px rgba(0, 242, 255, 0.05);
-        display: flex; 
-        flex-direction: column; 
-        overflow: hidden; 
-        position: relative;
-    }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--depth-base);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow: hidden;
+            color: var(--text);
+            box-sizing: border-box;
+        }
 
-    .app-container::before, .app-container::after {
-        content: ''; position: absolute; width: 20px; height: 20px;
-        border: 2px solid var(--accent); opacity: 0.5; pointer-events: none;
-    }
-    .app-container::before { top: 10px; left: 10px; border-right: none; border-bottom: none; }
-    .app-container::after { bottom: 10px; right: 10px; border-left: none; border-top: none; }
+        /* 基礎動態背景 */
+        .mesh-bg {
+            position: fixed;
+            inset: -50%;
+            z-index: -2;
+            background: 
+                radial-gradient(circle at 20% 30%, var(--depth-purple) 0, transparent 50%),
+                radial-gradient(circle at 80% 70%, var(--depth-blue) 0, transparent 50%),
+                linear-gradient(135deg, #000 0%, #050512 100%);
+            filter: blur(60px);
+            animation: deepFlow 25s infinite alternate ease-in-out;
+        }
 
-    .toolbar { 
-        padding: 30px 40px 20px 40px; 
-        display: grid; 
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
-        gap: 20px; 
-        background: rgba(0,0,0,0.2);
-        border-bottom: 1px solid var(--border-inner);
-        box-shadow: inset 0 -5px 10px var(--panel-inset);
-    }
-    .input-group { display: flex; flex-direction: column; gap: 8px; }
-    .input-group label { 
-        font-size: 9px; color: #666; text-transform: uppercase; font-weight: 900; letter-spacing: 2px; 
-        text-shadow: 0 1px 1px rgba(0,0,0,0.8);
-    }
-    .inputs { 
-        display: flex; gap: 8px; align-items: center; 
-        padding: 4px; background: var(--panel-inset); border-radius: 10px;
-        border: 1px solid var(--border-inner);
-    }
+        @keyframes deepFlow {
+            0% { transform: scale(1) rotate(0deg); }
+            100% { transform: scale(1.1) rotate(2deg); }
+        }
 
-    /* 下拉選單樣式 */
-    select {
-        background: #0a0a0a; border: 1px solid #222; color: var(--accent); 
-        padding: 8px 12px; border-radius: 6px; flex-grow: 1;
-        font-family: 'JetBrains Mono', monospace; font-size: 12px; outline: none; 
-        box-shadow: inset 0 3px 5px rgba(0,0,0,0.5);
-        cursor: pointer; appearance: none;
-    }
-    select:focus { border-color: var(--accent); }
+        #ambient-bg {
+            position: absolute;
+            inset: -10%;
+            z-index: -1;
+            background-size: cover;
+            background-position: center;
+            filter: blur(120px) saturate(2);
+            opacity: 0;
+            transition: opacity 2s ease;
+        }
 
-    input { 
-        background: #0a0a0a; border: 1px solid #222; color: var(--accent); 
-        padding: 8px 12px; border-radius: 6px; width: 70px; 
-        font-family: 'JetBrains Mono', monospace; font-size: 14px; outline: none; 
-        box-shadow: inset 0 3px 5px rgba(0,0,0,0.5);
-        transition: all 0.2s; font-weight: bold;
-    }
-    input:focus { border-color: var(--accent); box-shadow: inset 0 2px 5px rgba(0,0,0,0.5), 0 0 10px var(--accent-glow); color: var(--text-bright); }
-    
-    .btn-tool { 
-        background: linear-gradient(180deg, #2a2a2a, #1a1a1a); 
-        color: #777; border: 1px solid #333; border-top-color: #444;
-        padding: 8px; border-radius: 6px; cursor: pointer; transition: 0.2s; 
-        display: flex; align-items: center; justify-content: center; 
-        box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-    }
-    .btn-tool:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0,0,0,0.5); }
-    .btn-tool.active { 
-        background: linear-gradient(180deg, rgba(0, 242, 255, 0.1), rgba(0, 242, 255, 0.05));
-        color: var(--accent); border-color: var(--accent); 
-        box-shadow: inset 0 0 10px var(--accent-glow), 0 0 5px var(--accent-glow);
-        text-shadow: 0 0 5px var(--accent);
-    }
-    .btn-tool svg { width: 16px; height: 16px; fill: currentColor; }
+        #toast {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent);
+            color: #000;
+            padding: 12px 28px;
+            border-radius: 40px;
+            font-weight: 800;
+            font-size: 10px;
+            letter-spacing: 3px;
+            display: none;
+            z-index: 9999;
+            box-shadow: 0 15px 40px var(--accent-glow);
+            text-transform: uppercase;
+        }
 
-    .main-stage { 
-        position: relative; height: 500px; 
-        background: #050505;
-        background-image: 
-            linear-gradient(rgba(0, 242, 255, 0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
-        background-size: 20px 20px;
-        display: flex; align-items: center; justify-content: center; flex-direction: column; 
-        border-top: 1px solid #000; border-bottom: 1px solid #000;
-        box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
-    }
-    #dropzone { 
-        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10; cursor: pointer; 
-        color: #444; font-weight: 800; letter-spacing: 1px; font-size: 12px;
-        text-transform: uppercase;
-    }
-    #dropzone p { background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 4px; border: 1px dashed #333; }
-    #dropzone.active { pointer-events: none; opacity: 0; }
-    .img-container { width: 100%; height: 100%; display: none; }
-    #videoSource { display: none; }
+        .app-container {
+            width: 100%;
+            max-width: 1100px;
+            height: 100%;
+            max-height: 800px;
+            border-radius: 40px;
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.01);
+            box-shadow: 0 50px 120px rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
 
-    .video-controls { 
-        width: 100%; padding: 15px 40px 20px 40px; display: none; 
-        flex-direction: column; gap: 12px; box-sizing: border-box; 
-        background: rgba(0,0,0,0.3); border-top: 1px solid #222;
-    }
-    .frame-btns { display: flex; gap: 8px; justify-content: center; align-items: center; }
-    .btn-frame { 
-        background: #1a1a1a; color: var(--accent); border: 1px solid #333; 
-        padding: 4px 10px; border-radius: 4px; cursor: pointer; 
-        font-family: 'JetBrains Mono'; font-size: 11px; font-weight: bold;
-        box-shadow: 0 2px 2px rgba(0,0,0,0.3);
-    }
-    .btn-frame:hover { background: var(--accent-glow); color: var(--text-bright); border-color: var(--accent); }
-    
-    input[type="range"] { 
-        width: 100%; accent-color: var(--accent); cursor: pointer; height: 6px; 
-        background: #000; border-radius: 3px; border: 1px solid #222;
-    }
-    .time-info { 
-        font-size: 12px; color: var(--accent); font-family: 'JetBrains Mono'; text-align: center; 
-        font-weight: bold; text-shadow: 0 0 5px var(--accent-glow); width: 90px;
-    }
+        /* 工具列 */
+        .toolbar {
+            position: absolute;
+            top: 0; left: 0; width: 100%;
+            padding: 20px 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            border-bottom: 1px solid var(--glass-border);
+            z-index: 100;
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            background: rgba(0, 0, 0, 0.4);
+            box-sizing: border-box;
+        }
 
-    .actions { 
-        padding: 20px 40px 30px 40px; display: flex; gap: 16px; justify-content: center; 
-        background: linear-gradient(0deg, rgba(0,0,0,0.4), transparent);
-        border-top: 1px solid #1a1a1a;
-    }
-    .main-btn { 
-        padding: 14px 40px; border-radius: 8px; border: none; cursor: pointer; 
-        font-weight: 800; transition: 0.3s; font-size: 13px; letter-spacing: 1px;
-        text-transform: uppercase; position: relative; overflow: hidden;
-    }
-    .btn-copy { 
-        background: var(--accent); color: #000; 
-        box-shadow: 0 0 20px var(--accent-glow), inset 0 1px 0 rgba(255,255,255,0.4);
-    }
-    .btn-copy:hover { 
-        background: #ffffff; box-shadow: 0 0 40px var(--accent-glow); 
-    }
-    .btn-dl {
-        background: #222; color: #888; border: 1px solid #333;
-    }
-    .btn-dl:hover { color: #ccc; border-color: #555; }
-    
-    .cropper-modal { background-color: rgba(0, 0, 0, 0.9) !important; }
-    .cropper-view-box { outline: 2px solid var(--accent); box-shadow: 0 0 15px var(--accent-glow) !important; }
-    .cropper-line { background-color: var(--accent); }
-    .cropper-point { background-color: var(--accent); width: 6px; height: 6px; opacity: 0.8; }
-    .cropper-center { display: none; }
+        .input-group { display: flex; flex-direction: column; gap: 6px; }
+        .input-group label {
+            font-size: 8px;
+            color: rgba(255,255,255,0.25);
+            text-transform: uppercase;
+            font-weight: 800;
+            letter-spacing: 3px;
+        }
 
-    #toast { position: fixed; top: 30px; background: var(--accent); color: #000; padding: 12px 30px; border-radius: 8px; font-weight: 900; display: none; z-index: 1000; box-shadow: 0 10px 30px var(--accent-glow); letter-spacing: 1px; }
-</style>
+        .inputs-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: var(--panel-inner);
+            padding: 5px 10px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.06);
+            transition: 0.3s;
+            min-height: 34px;
+            box-sizing: border-box;
+        }
+
+        /* 自定義下拉選單樣式 */
+        .custom-select {
+            position: relative;
+            min-width: 140px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+            user-select: none;
+        }
+        .select-trigger {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 5px;
+        }
+        .select-trigger:after {
+            content: '';
+            border: solid var(--accent);
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 3px;
+            transform: rotate(45deg);
+            margin-left: 10px;
+            transition: 0.3s;
+        }
+        .custom-select.open .select-trigger:after {
+            transform: rotate(-135deg);
+        }
+
+        .select-options {
+            position: absolute;
+            top: calc(100% + 12px);
+            left: -10px;
+            right: -10px;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(25px) saturate(200%);
+            -webkit-backdrop-filter: blur(25px) saturate(200%);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            overflow: hidden;
+            display: none;
+            z-index: 200;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            padding: 8px 0;
+        }
+        .custom-select.open .select-options { display: block; animation: selectFade 0.2s ease-out; }
+        
+        @keyframes selectFade {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .option {
+            padding: 10px 20px;
+            color: rgba(255,255,255,0.6);
+            transition: 0.2s;
+            font-size: 11px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .option:hover { background: rgba(0, 242, 255, 0.1); color: var(--accent); }
+        .option.selected { color: var(--accent); font-weight: 800; background: rgba(0, 242, 255, 0.05); }
+
+        input {
+            background: transparent;
+            border: none;
+            color: var(--text-bright);
+            padding: 6px;
+            font-size: 13px;
+            outline: none;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; width: 45px; text-align: center; }
+
+        .btn-icon {
+            background: rgba(255,255,255,0.04);
+            color: var(--text);
+            border: none;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.25s;
+        }
+        .btn-icon:hover { background: rgba(255,255,255,0.12); color: #fff; }
+        .btn-icon.active { color: var(--accent); background: rgba(0, 242, 255, 0.12); border: 1px solid rgba(0, 242, 255, 0.2); }
+
+        .main-stage {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        #dropzone {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            background: rgba(0,0,0,0.1);
+        }
+        #dropzone.hidden { opacity: 0; pointer-events: none; }
+        
+        .upload-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 50px 80px;
+            border-radius: 32px;
+            backdrop-filter: blur(20px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .upload-card:hover { border-color: var(--accent); background: rgba(0, 242, 255, 0.05); }
+
+        .img-container { width: 100%; height: 100%; display: none; justify-content: center; align-items: center; }
+        #image { max-width: 100%; display: block; }
+
+        /* 底部工具欄與影片控制 */
+        .footer-bar {
+            position: absolute;
+            bottom: 0; left: 0; width: 100%;
+            z-index: 100;
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            background: rgba(0, 0, 0, 0.5);
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .video-ui {
+            padding: 12px 30px;
+            display: none; /* 預設隱藏，影片載入後顯示 */
+            flex-direction: column;
+            gap: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .time-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .time-display {
+            font-family: monospace;
+            font-size: 11px;
+            color: var(--accent);
+            min-width: 90px;
+            text-shadow: 0 0 10px var(--accent-glow);
+        }
+        input[type="range"] {
+            flex: 1;
+            accent-color: var(--accent);
+            height: 4px;
+            cursor: pointer;
+        }
+
+        .frame-nav {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        .btn-frame {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: var(--text);
+            padding: 5px 12px;
+            border-radius: 8px;
+            font-size: 9px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-frame:hover { background: rgba(255,255,255,0.1); color: var(--text-bright); border-color: var(--accent); }
+
+        .action-row { padding: 20px 36px; display: flex; justify-content: center; gap: 20px; }
+        .btn-main {
+            padding: 14px 38px;
+            border-radius: 16px;
+            font-weight: 800;
+            font-size: 11px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+        .btn-copy { background: var(--text-bright); color: #000; }
+        .btn-copy:hover { transform: translateY(-2px); background: var(--accent); box-shadow: 0 15px 35px var(--accent-glow); }
+        .btn-dl { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.7); border-color: var(--glass-border); }
+
+        /* Cropper UI */
+        .cropper-view-box { outline: 1px solid var(--accent); }
+        .cropper-point { background-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+        .cropper-modal { opacity: 0.5 !important; background-color: #000 !important; }
+    </style>
 </head>
 <body>
 
+<div class="mesh-bg"></div>
 <div id="toast">ACTION COMPLETED</div>
 
 <div class="app-container">
-    <div class="toolbar">
+    <div id="ambient-bg"></div>
+
+    <header class="toolbar">
         <div class="input-group">
-            <label>Ratio Presets [Armory]</label>
-            <div class="inputs">
-                <select id="ratioPreset">
-                    <option value="custom">CUSTOM [FREE FORM]</option>
-                    <option value="1:1">1:1 [SQUARE / INSTA]</option>
-                    <option value="4:3">4:3 [CLASSIC / SDTV]</option>
-                    <option value="16:9" selected>16:9 [HD / WIDESCREEN]</option>
-                    <option value="21:9">21:9 [CINEMASCOPE / ULTRA]</option>
-                    <option value="1.43:1">1.43:1 [IMAX GT / 70MM]</option>
-                    <option value="1.90:1">1.90:1 [IMAX DIGITAL / LIEMAX]</option>
-                    <option value="9:16">9:16 [PORTRAIT / TIKTOK]</option>
-                </select>
+            <label>比例預設</label>
+            <div class="inputs-row">
+                <div class="custom-select" id="ratioSelect">
+                    <div class="select-trigger" id="selectValue">16:9 HD</div>
+                    <div class="select-options">
+                        <div class="option" data-value="custom">Free Form</div>
+                        <div class="option" data-value="1:1">1:1 Square</div>
+                        <div class="option" data-value="4:3">4:3 Classic</div>
+                        <div class="option selected" data-value="16:9">16:9 HD</div>
+                        <div class="option" data-value="21:9">21:9 Cinema</div>
+                        <div class="option" data-value="9:16">9:16 Portrait</div>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div class="input-group">
-            <label>Ratio Control</label>
-            <div class="inputs">
+            <label>精準比例</label>
+            <div class="inputs-row">
                 <input type="number" id="aspW" value="16" step="0.1">
-                <button class="btn-tool" id="lockBtn">
-                    <svg id="lockIcon" viewBox="0 0 24 24"><path id="lockPath" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM9 8V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9z"/></svg>
+                <button class="btn-icon active" id="lockBtn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM9 8V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9z"/></svg>
                 </button>
                 <input type="number" id="aspH" value="9" step="0.1">
-                <button class="btn-tool" id="swapRatioBtn" title="Swap Width/Height">⇄</button>
             </div>
         </div>
 
         <div class="input-group">
-            <label>Pixels (**16x**)</label>
-            <div class="inputs">
-                <input type="number" id="pxW" placeholder="W">
-                <button class="btn-tool" id="snapBtn">16</button>
-                <input type="number" id="pxH" placeholder="H">
+            <label>像素對齊</label>
+            <div class="inputs-row">
+                <input type="number" id="pxW" placeholder="W" readonly>
+                <button class="btn-icon" id="snapBtn">
+                    <span style="font-size:9px;font-weight:900">16</span>
+                </button>
+                <input type="number" id="pxH" placeholder="H" readonly>
             </div>
         </div>
-    </div>
 
-    <div class="main-stage" id="dropArea">
-        <div id="dropzone"><p>PASTE, DRAG OR DBLCLICK</p></div>
+        <div class="input-group">
+            <label>畫布</label>
+            <div class="inputs-row">
+                <button class="btn-icon" id="rotateLeft">↺</button>
+                <button class="btn-icon" id="flipX">↔</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-stage">
+        <div id="dropzone">
+            <div class="upload-card">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p>PASTE, DRAG OR CLICK</p>
+            </div>
+        </div>
         <div class="img-container" id="imgBox">
             <img id="image">
         </div>
-        <video id="videoSource"></video>
-    </div>
+        <video id="videoSource" style="display:none;"></video>
+    </main>
 
-    <div class="video-controls" id="videoUI">
-        <div class="frame-btns">
-            <button class="btn-frame" onclick="stepFrame(-10)">-10</button>
-            <button class="btn-frame" onclick="stepFrame(-1)">PREV</button>
-            <div class="time-info" id="timeDisplay">00:00.000</div>
-            <button class="btn-frame" onclick="stepFrame(1)">NEXT</button>
-            <button class="btn-frame" onclick="stepFrame(10)">+10</button>
+    <footer class="footer-bar">
+        <!-- 影片控制 UI：現在適配玻璃風格 -->
+        <div class="video-ui" id="videoUI">
+            <div class="time-row">
+                <div class="time-display" id="timeDisplay">00:00.000</div>
+                <input type="range" id="timeline" step="0.001" value="0">
+            </div>
+            <div class="frame-nav">
+                <button class="btn-frame" onclick="stepFrame(-10)">-10幀</button>
+                <button class="btn-frame" onclick="stepFrame(-1)">上一幀</button>
+                <button class="btn-frame" onclick="stepFrame(1)">下一幀</button>
+                <button class="btn-frame" onclick="stepFrame(10)">+10幀</button>
+            </div>
         </div>
-        <input type="range" id="timeline" step="0.001" value="0">
-    </div>
-
-    <div class="actions">
-        <button class="main-btn btn-copy" id="copyBtn">COPY TO CLIPBOARD</button>
-        <button class="main-btn btn-dl" style="background:#1a1a1a; color:#666;" id="dlBtn">SAVE AS PNG</button>
-        <input type="file" id="fileInput" hidden accept="image/*,video/mp4">
-    </div>
+        <div class="action-row">
+            <button class="btn-main btn-copy" id="copyBtn">複製到剪貼簿</button>
+            <button class="btn-main btn-dl" id="dlBtn">儲存 PNG 圖片</button>
+            <input type="file" id="fileInput" hidden accept="image/*,video/mp4,video/quicktime">
+        </div>
+    </footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <script>
-    const video = document.getElementById('videoSource'), image = document.getElementById('image'),
-          imgBox = document.getElementById('imgBox'), videoUI = document.getElementById('videoUI'),
-          timeline = document.getElementById('timeline'), timeDisplay = document.getElementById('timeDisplay'),
-          dropzone = document.getElementById('dropzone'), fileInput = document.getElementById('fileInput'),
+    const video = document.getElementById('videoSource'), 
+          image = document.getElementById('image'),
+          imgBox = document.getElementById('imgBox'), 
+          videoUI = document.getElementById('videoUI'),
+          ambientBg = document.getElementById('ambient-bg'),
+          timeline = document.getElementById('timeline'),
+          timeDisplay = document.getElementById('timeDisplay'),
+          dropzone = document.getElementById('dropzone'), 
+          fileInput = document.getElementById('fileInput'),
           pxW = document.getElementById('pxW'), pxH = document.getElementById('pxH'),
           aspW = document.getElementById('aspW'), aspH = document.getElementById('aspH'),
-          lockBtn = document.getElementById('lockBtn'), lockPath = document.getElementById('lockPath'),
+          lockBtn = document.getElementById('lockBtn'), 
           snapBtn = document.getElementById('snapBtn'),
-          ratioPreset = document.getElementById('ratioPreset'); // ADDED
+          ratioSelect = document.getElementById('ratioSelect'),
+          selectValue = document.getElementById('selectValue');
 
-    let cropper, isSnap16 = false, isRatioLocked = true, internalUpdate = false;
-    let fps = 30; 
+    let cropper, isSnap16 = false, isRatioLocked = true;
+    const fps = 30; // 預設 30fps
 
+    // 下拉選單邏輯
+    ratioSelect.addEventListener('click', (e) => {
+        ratioSelect.classList.toggle('open');
+        e.stopPropagation();
+    });
+
+    document.querySelectorAll('.option').forEach(option => {
+        option.addEventListener('click', function() {
+            const val = this.getAttribute('data-value');
+            selectValue.innerText = this.innerText;
+            document.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
+            this.classList.add('selected');
+
+            if (val === "custom") {
+                isRatioLocked = false;
+                lockBtn.classList.remove('active');
+            } else {
+                const [w, h] = val.split(':').map(Number);
+                aspW.value = w; aspH.value = h;
+                isRatioLocked = true;
+                lockBtn.classList.add('active');
+            }
+            if (cropper) cropper.setAspectRatio(isRatioLocked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN);
+        });
+    });
+
+    window.addEventListener('click', () => ratioSelect.classList.remove('open'));
+
+    // 影片步進功能
     function stepFrame(frames) {
         if (!video.src) return;
         video.pause();
-        const frameTime = 1 / fps; 
-        video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + (frames * frameTime)));
+        video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + (frames * (1/fps))));
         timeline.value = video.currentTime;
-        updateTimeDisplay();
+        updateTimeUI();
     }
 
-    function updateTimeDisplay() {
-        timeDisplay.innerText = `${Math.floor(video.currentTime/60).toString().padStart(2,'0')}:${(video.currentTime%60).toFixed(3).padStart(6,'0')}`;
+    function updateTimeUI() {
+        const m = Math.floor(video.currentTime / 60).toString().padStart(2, '0');
+        const s = (video.currentTime % 60).toFixed(3).padStart(6, '0');
+        timeDisplay.innerText = `${m}:${s}`;
     }
-
-    function swapDimensions() {
-        if (!cropper) {
-            [aspW.value, aspH.value] = [aspH.value, aspW.value];
-            return;
-        }
-        internalUpdate = true;
-        const data = cropper.getData();
-        const oldW = parseFloat(aspW.value);
-        const oldH = parseFloat(aspH.value);
-        aspW.value = oldH;
-        aspH.value = oldW;
-        const newRatio = oldH / oldW;
-        cropper.setAspectRatio(isRatioLocked ? newRatio : NaN);
-        cropper.setData({
-            width: data.height,
-            height: data.width,
-            x: data.x + (data.width / 2) - (data.height / 2),
-            y: data.y + (data.height / 2) - (data.width / 2)
-        });
-        const newData = cropper.getData();
-        pxW.value = Math.round(newData.width);
-        pxH.value = Math.round(newData.height);
-        internalUpdate = false;
-        if (isSnap16) commitSnap();
-    }
-
-    async function copyImg() {
-        if (!cropper) return;
-        if (isSnap16) commitSnap();
-        cropper.getCroppedCanvas().toBlob(async (blob) => {
-            try {
-                await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-                showToast("COPIED TO CLIPBOARD");
-            } catch (err) { showToast("FAILED TO COPY"); }
-        }, 'image/png');
-    }
-
-    window.addEventListener('keydown', (e) => {
-        const isCopy = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c';
-        if (!isCopy) return;
-        const t = e.target;
-        if (t && t.tagName === 'INPUT') {
-            const type = (t.getAttribute('type') || '').toLowerCase();
-            if (new Set(['text', 'number', 'search', 'email', 'tel', 'url', 'password']).has(type)) return;
-        }
-        e.preventDefault();
-        copyImg();
-    }, true);
-
-    function setLockState(locked) {
-        isRatioLocked = locked;
-        lockBtn.classList.toggle('active', locked);
-        lockPath.setAttribute('d', locked 
-            ? "M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zM9 8V6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9z"
-            : "M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z");
-        if (cropper) cropper.setAspectRatio(locked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN);
-        if (!locked) ratioPreset.value = "custom"; // ADDED
-    }
-
-    lockBtn.onclick = () => setLockState(!isRatioLocked);
-    snapBtn.onclick = () => { isSnap16 = !isSnap16; snapBtn.classList.toggle('active', isSnap16); if(isSnap16) commitSnap(); };
-
-    // ADDED: 處理預設集選擇
-    ratioPreset.onchange = (e) => {
-        const val = e.target.value;
-        if (val === "custom") {
-            setLockState(false);
-            return;
-        }
-        const [w, h] = val.split(':').map(Number);
-        aspW.value = w;
-        aspH.value = h;
-        setLockState(true);
-        if (cropper) {
-            internalUpdate = true;
-            cropper.setAspectRatio(w / h);
-            const data = cropper.getData();
-            pxW.value = Math.round(data.width);
-            pxH.value = Math.round(data.height);
-            internalUpdate = false;
-            if (isSnap16) commitSnap();
-        }
-    };
-
-    function commitSnap() {
-        if (!cropper || !isSnap16 || internalUpdate) return;
-        internalUpdate = true;
-        let data = cropper.getData();
-        let w = Math.round(data.width / 16) * 16;
-        let h = isRatioLocked 
-            ? Math.round((w / (parseFloat(aspW.value)/parseFloat(aspH.value))) / 16) * 16 
-            : Math.round(data.height / 16) * 16;
-        pxW.value = w; pxH.value = h;
-        cropper.setData({ width: w, height: h });
-        internalUpdate = false;
-    }
-
-    [pxW, pxH].forEach(el => {
-        el.onchange = commitSnap;
-        el.oninput = () => {
-            if (internalUpdate || !cropper) return;
-            internalUpdate = true;
-            setLockState(false);
-            let w = parseFloat(pxW.value) || 1, h = parseFloat(pxH.value) || 1;
-            aspW.value = (w/h).toFixed(2); aspH.value = 1;
-            cropper.setAspectRatio(NaN);
-            cropper.setData({ width: w, height: h });
-            internalUpdate = false;
-        };
-    });
-
-    [aspW, aspH].forEach(el => el.oninput = () => {
-        if (internalUpdate || !cropper) return;
-        internalUpdate = true;
-        setLockState(true);
-        cropper.setAspectRatio(parseFloat(aspW.value)/parseFloat(aspH.value));
-        const data = cropper.getData();
-        pxW.value = Math.round(data.width); pxH.value = Math.round(data.height);
-        internalUpdate = false;
-        ratioPreset.value = "custom"; // 使用者手動改比例時，重置選單
-    });
 
     function initCropper() {
+        if(cropper) cropper.destroy();
         cropper = new Cropper(image, {
-            viewMode: 1, dragMode: 'move', autoCropArea: 0.8,
+            viewMode: 1, dragMode: 'move', autoCropArea: 0.65, center: true, background: false, responsive: true,
             aspectRatio: isRatioLocked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN,
-            crop(e) {
-                if (internalUpdate) return;
-                pxW.value = Math.round(e.detail.width); 
-                pxH.value = Math.round(e.detail.height);
-                if (!isRatioLocked) { aspW.value = (e.detail.width/e.detail.height).toFixed(2); aspH.value = 1; }
-            },
-            cropend() { if (isSnap16) commitSnap(); }
+            crop(e) { pxW.value = Math.round(e.detail.width); pxH.value = Math.round(e.detail.height); },
+            cropend() { if (isSnap16) applySnap16(); }
         });
     }
 
-    function syncVideoToCropper() {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        const url = canvas.toDataURL('image/png');
-        if (!cropper) { image.src = url; imgBox.style.display = 'block'; initCropper(); }
-        else { cropper.replace(url, true); }
+    function applySnap16() {
+        if (!cropper) return;
+        const data = cropper.getData();
+        let newW = Math.round(data.width / 16) * 16;
+        let newH = isRatioLocked 
+            ? Math.round((newW / (parseFloat(aspW.value)/parseFloat(aspH.value))) / 16) * 16 
+            : Math.round(data.height / 16) * 16;
+        cropper.setData({ width: newW, height: newH });
     }
 
     function handleFile(file) {
         if (!file) return;
-        const isVid = file.type.startsWith('video/');
-        dropzone.classList.add('active');
-        if (isVid) {
-            video.src = URL.createObjectURL(file); videoUI.style.display = 'flex';
-            video.onloadedmetadata = () => { timeline.max = video.duration; video.currentTime = 0.01; };
-            video.onseeked = syncVideoToCropper;
+        const url = URL.createObjectURL(file);
+        ambientBg.style.backgroundImage = `url(${url})`;
+        ambientBg.style.opacity = "0.45";
+        dropzone.classList.add('hidden');
+        imgBox.style.display = 'flex';
+
+        if (file.type.startsWith('video/')) {
+            video.src = url;
+            videoUI.style.display = 'flex';
+            video.onloadedmetadata = () => {
+                timeline.max = video.duration;
+                video.currentTime = 0.1;
+            };
+            video.onseeked = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0);
+                image.src = canvas.toDataURL('image/png');
+                initCropper();
+                updateTimeUI();
+            };
         } else {
             videoUI.style.display = 'none';
-            const reader = new FileReader();
-            reader.onload = (e) => { image.src = e.target.result; imgBox.style.display = 'block'; if (cropper) cropper.destroy(); setTimeout(initCropper, 50); };
-            reader.readAsDataURL(file);
+            image.src = url;
+            setTimeout(initCropper, 150);
         }
     }
+
+    lockBtn.onclick = () => {
+        isRatioLocked = !isRatioLocked;
+        lockBtn.classList.toggle('active', isRatioLocked);
+        if (!isRatioLocked) selectValue.innerText = "FREE FORM";
+        if (cropper) cropper.setAspectRatio(isRatioLocked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN);
+    };
+
+    snapBtn.onclick = () => {
+        isSnap16 = !isSnap16;
+        snapBtn.classList.toggle('active', isSnap16);
+        if (isSnap16) applySnap16();
+    };
+
+    document.getElementById('rotateLeft').onclick = () => cropper?.rotate(-90);
+    document.getElementById('flipX').onclick = () => cropper?.scaleX(cropper.getData().scaleX * -1);
+
+    // 增強貼上邏輯，支援影片
+    window.addEventListener('paste', (e) => {
+        for (let item of e.clipboardData.items) {
+            if (item.type.includes('image') || item.type.includes('video')) {
+                handleFile(item.getAsFile());
+                break;
+            }
+        }
+    });
+
+    dropzone.onclick = () => fileInput.click();
+    fileInput.onchange = (e) => handleFile(e.target.files[0]);
+
+    async function performCopy() {
+        if (!cropper) return;
+        cropper.getCroppedCanvas().toBlob(async (blob) => {
+            try {
+                if (!navigator.clipboard || !window.ClipboardItem) throw new Error();
+                await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+                showToast("COPIED TO CLIPBOARD");
+            } catch (err) { showToast("RESTRICTED: PLEASE DOWNLOAD"); }
+        });
+    }
+
+    document.getElementById('copyBtn').onclick = performCopy;
+    document.getElementById('dlBtn').onclick = () => {
+        if (!cropper) return;
+        const link = document.createElement('a');
+        link.download = `crop_${Date.now()}.png`;
+        link.href = cropper.getCroppedCanvas().toDataURL();
+        link.click();
+        showToast("IMAGE SAVED");
+    };
 
     function showToast(msg) {
         const t = document.getElementById('toast');
         t.innerText = msg; t.style.display = 'block'; 
-        setTimeout(() => t.style.display='none', 2000);
+        setTimeout(() => t.style.display='none', 3000);
     }
 
-    timeline.oninput = () => { video.currentTime = timeline.value; updateTimeDisplay(); };
-    window.addEventListener('paste', (e) => { for (let item of e.clipboardData.items) { if (item.type.includes('image') || item.type.includes('video')) { handleFile(item.getAsFile()); break; } } });
-    document.getElementById('copyBtn').onclick = copyImg;
-    dropzone.ondblclick = () => fileInput.click();
-    fileInput.onchange = (e) => handleFile(e.target.files[0]);
-    document.getElementById('swapRatioBtn').onclick = swapDimensions;
-    document.getElementById('dlBtn').onclick = () => {
-        if (!cropper) return;
-        const a = document.createElement('a'); a.download = `crop_${Date.now()}.png`;
-        a.href = cropper.getCroppedCanvas().toDataURL(); a.click();
-    };
-    setLockState(true);
+    window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+            if (cropper) { e.preventDefault(); performCopy(); }
+        }
+    });
+
+    timeline.oninput = () => { video.currentTime = timeline.value; updateTimeUI(); };
 </script>
 </body>
 </html>
