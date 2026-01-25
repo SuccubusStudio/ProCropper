@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Cropper V8.0 - Professional Suite</title>
+    <title>Pro Cropper V8.2 - Movable Box</title>
     <!-- Cropper.js CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
@@ -255,6 +255,7 @@
         .cropper-view-box { outline: 1px solid var(--accent); }
         .cropper-point { background-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
         .cropper-face { background-color: transparent; }
+        .cropper-modal { background-color: #000; opacity: 0.6; }
     </style>
 </head>
 <body>
@@ -373,9 +374,11 @@
 
     let cropper, isSnap16 = false, isRatioLocked = true;
     let isInternalUpdate = false;
+    // 記錄最後一次合法的螢幕裁切框大小 (寬度/高度)
+    let fixedCropBoxDim = null; 
     const fps = 30;
 
-    // --- Core Interaction Logic (Input Priority) ---
+    // --- Core Interaction Logic ---
 
     [aspW, aspH].forEach(input => {
         input.addEventListener('input', () => {
@@ -400,6 +403,8 @@
                 width: parseFloat(pxW.value) || data.width,
                 height: parseFloat(pxH.value) || data.height
             });
+            // 手動改變尺寸後，更新記錄
+            setTimeout(recordCropBoxDim, 100);
         });
     });
 
@@ -434,25 +439,52 @@
     };
 
     function updateCropperRatio() {
-        if (cropper) cropper.setAspectRatio(isRatioLocked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN);
+        if (cropper) {
+            cropper.setAspectRatio(isRatioLocked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN);
+            setTimeout(recordCropBoxDim, 100);
+        }
+    }
+
+    // 記錄當前裁切框在螢幕上的尺寸 (容器座標)
+    function recordCropBoxDim() {
+        if (cropper) {
+            fixedCropBoxDim = cropper.getCropBoxData();
+        }
     }
 
     function initCropper() {
         if(cropper) cropper.destroy();
+        
         cropper = new Cropper(image, {
-            viewMode: 1, dragMode: 'move', autoCropArea: 0.65, center: true, background: false, responsive: true,
+            viewMode: 1, // 限制裁切框不超過畫布
+            dragMode: 'move', // 預設模式：移動圖片
+            cropBoxMovable: true, // 修正：允許拖曳裁切框！
+            cropBoxResizable: true, // 允許調整大小
+            toggleDragModeOnDblclick: false, 
+            autoCropArea: 0.65,
+            center: true, 
+            background: false, 
+            responsive: true,
             restore: false,
+            
             ready() {
+                // 初始化時調整縮放以適應視窗
                 const containerData = cropper.getContainerData();
                 const toolbarH = document.querySelector('.toolbar').offsetHeight;
                 const footerH = document.querySelector('.footer-bar').offsetHeight;
                 const visibleHeight = containerData.height - toolbarH - footerH;
                 const canvasData = cropper.getCanvasData();
+                
                 if (canvasData.height < visibleHeight) {
                     cropper.zoomTo(visibleHeight / canvasData.naturalHeight);
                 }
+                
+                // 記錄初始裁切框大小
+                recordCropBoxDim();
             },
+            
             aspectRatio: isRatioLocked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN,
+            
             crop(e) { 
                 if (document.activeElement !== pxW && document.activeElement !== pxH) {
                     isInternalUpdate = true;
@@ -461,7 +493,66 @@
                     isInternalUpdate = false;
                 }
             },
-            cropend() { if (isSnap16) applySnap16(); }
+            
+            cropend() {
+                // 當使用者移動或調整完裁切框後，更新固定的尺寸與位置記錄
+                if (isSnap16) applySnap16();
+                recordCropBoxDim();
+            },
+
+            // --- 核心修改：縮放時保持裁切框螢幕大小固定，且位置跟隨之前的設定 ---
+            zoom(e) {
+                // 如果沒有記錄過尺寸，先不處理
+                if (!fixedCropBoxDim) return;
+
+                // 預測縮放後的圖片大小
+                const newRatio = e.detail.ratio;
+                const naturalWidth = cropper.getImageData().naturalWidth;
+                const naturalHeight = cropper.getImageData().naturalHeight;
+                const newCanvasWidth = naturalWidth * newRatio;
+                const newCanvasHeight = naturalHeight * newRatio;
+
+                // 這裡解決「縮小會卡住」的問題：
+                // 如果縮放後的圖片寬度，小於我們想固定的裁切框寬度
+                // 我們就必須允許裁切框變小
+                let targetWidth = fixedCropBoxDim.width;
+                let targetHeight = fixedCropBoxDim.height;
+
+                if (newCanvasWidth < targetWidth) {
+                    targetWidth = newCanvasWidth;
+                }
+                if (newCanvasHeight < targetHeight) {
+                    targetHeight = newCanvasHeight;
+                }
+
+                // 使用 setTimeout 在縮放發生的下一幀，強制重設裁切框
+                setTimeout(() => {
+                    let destLeft = fixedCropBoxDim.left;
+                    let destTop = fixedCropBoxDim.top;
+                    
+                    // 獲取當前最新的 Canvas 數據 (Zoom 之後)
+                    const currentCanvas = cropper.getCanvasData();
+                    
+                    // 如果圖片縮到比框還小 (亦即框的大小被迫縮小到貼合圖片)
+                    // 這時候框的位置應該要強制跟隨圖片，不然會看起來飄在半空
+                    // 簡單判斷：如果目標寬度明顯小於原本記錄的寬度，代表進入了「圖片比框小」的狀態
+                    if (targetWidth < fixedCropBoxDim.width - 0.5) {
+                         destLeft = currentCanvas.left;
+                    }
+                    if (targetHeight < fixedCropBoxDim.height - 0.5) {
+                         destTop = currentCanvas.top;
+                    }
+
+                    // 這裡不再使用「強制置中」的計算，而是直接使用 fixedCropBoxDim 的 left/top
+                    // 這樣如果你把框拖到左上角，縮放時它就會停在左上角
+                    cropper.setCropBoxData({
+                        width: targetWidth,
+                        height: targetHeight,
+                        left: destLeft,
+                        top: destTop
+                    });
+                }, 0);
+            }
         });
     }
 
@@ -530,7 +621,16 @@
         }
     });
 
-    // 改為雙擊開啟檔案，避免單擊誤觸
+    // 快捷鍵 Ctrl+C 支援
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+            // 如果焦點在輸入框內，使用預設複製行為
+            if (document.activeElement.tagName === 'INPUT') return;
+            e.preventDefault(); // 防止預設行為 (有時候瀏覽器會擋)
+            performCopy();
+        }
+    });
+
     dropzone.ondblclick = () => fileInput.click();
     fileInput.onchange = (e) => handleFile(e.target.files[0]);
 
@@ -538,9 +638,13 @@
         if (!cropper) return;
         cropper.getCroppedCanvas().toBlob(async (blob) => {
             try {
+                // 嘗試寫入剪貼簿
                 await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
                 showToast("COPIED TO CLIPBOARD");
-            } catch (err) { showToast("BROWSER RESTRICTED: PLEASE DOWNLOAD"); }
+            } catch (err) {
+                console.error(err);
+                showToast("Use Button to Copy"); 
+            }
         });
     }
 
@@ -566,6 +670,13 @@
         video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + (frames * (1/fps))));
         timeline.value = video.currentTime;
         updateTimeUI();
+    }
+    
+    function updateTimeUI() {
+        const date = new Date(0);
+        date.setSeconds(video.currentTime);
+        const ms = Math.floor((video.currentTime % 1) * 1000).toString().padStart(3, '0');
+        timeDisplay.innerText = date.toISOString().substr(14, 5) + '.' + ms;
     }
     timeline.oninput = () => { video.currentTime = timeline.value; updateTimeUI(); };
 </script>
