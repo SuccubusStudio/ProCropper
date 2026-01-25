@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Cropper V8.2 - Movable Box</title>
+    <title>Pro Cropper V8.3 - Video Master</title>
     <!-- Cropper.js CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
@@ -339,10 +339,9 @@
                 <input type="range" id="timeline" step="0.001" value="0">
             </div>
             <div class="frame-nav">
-                <button class="btn-frame" onclick="stepFrame(-10)">-10 FR</button>
+                <!-- 移除 +/- 10 FR 按鈕，只保留逐幀 -->
                 <button class="btn-frame" onclick="stepFrame(-1)">PREV FR</button>
                 <button class="btn-frame" onclick="stepFrame(1)">NEXT FR</button>
-                <button class="btn-frame" onclick="stepFrame(10)">+10 FR</button>
             </div>
         </div>
         <div class="action-row">
@@ -376,7 +375,9 @@
     let isInternalUpdate = false;
     // 記錄最後一次合法的螢幕裁切框大小 (寬度/高度)
     let fixedCropBoxDim = null; 
-    const fps = 30;
+    
+    // 將 FPS 設定為 60，讓步進更細緻，解決「不是真正逐幀」的感覺
+    const fps = 60;
 
     // --- Core Interaction Logic ---
 
@@ -403,7 +404,6 @@
                 width: parseFloat(pxW.value) || data.width,
                 height: parseFloat(pxH.value) || data.height
             });
-            // 手動改變尺寸後，更新記錄
             setTimeout(recordCropBoxDim, 100);
         });
     });
@@ -445,7 +445,6 @@
         }
     }
 
-    // 記錄當前裁切框在螢幕上的尺寸 (容器座標)
     function recordCropBoxDim() {
         if (cropper) {
             fixedCropBoxDim = cropper.getCropBoxData();
@@ -456,10 +455,10 @@
         if(cropper) cropper.destroy();
         
         cropper = new Cropper(image, {
-            viewMode: 1, // 限制裁切框不超過畫布
-            dragMode: 'move', // 預設模式：移動圖片
-            cropBoxMovable: true, // 修正：允許拖曳裁切框！
-            cropBoxResizable: true, // 允許調整大小
+            viewMode: 1, 
+            dragMode: 'move', 
+            cropBoxMovable: true, 
+            cropBoxResizable: true, 
             toggleDragModeOnDblclick: false, 
             autoCropArea: 0.65,
             center: true, 
@@ -468,7 +467,6 @@
             restore: false,
             
             ready() {
-                // 初始化時調整縮放以適應視窗
                 const containerData = cropper.getContainerData();
                 const toolbarH = document.querySelector('.toolbar').offsetHeight;
                 const footerH = document.querySelector('.footer-bar').offsetHeight;
@@ -479,7 +477,6 @@
                     cropper.zoomTo(visibleHeight / canvasData.naturalHeight);
                 }
                 
-                // 記錄初始裁切框大小
                 recordCropBoxDim();
             },
             
@@ -495,56 +492,34 @@
             },
             
             cropend() {
-                // 當使用者移動或調整完裁切框後，更新固定的尺寸與位置記錄
                 if (isSnap16) applySnap16();
                 recordCropBoxDim();
             },
 
-            // --- 核心修改：縮放時保持裁切框螢幕大小固定，且位置跟隨之前的設定 ---
             zoom(e) {
-                // 如果沒有記錄過尺寸，先不處理
                 if (!fixedCropBoxDim) return;
 
-                // 預測縮放後的圖片大小
                 const newRatio = e.detail.ratio;
                 const naturalWidth = cropper.getImageData().naturalWidth;
                 const naturalHeight = cropper.getImageData().naturalHeight;
                 const newCanvasWidth = naturalWidth * newRatio;
                 const newCanvasHeight = naturalHeight * newRatio;
 
-                // 這裡解決「縮小會卡住」的問題：
-                // 如果縮放後的圖片寬度，小於我們想固定的裁切框寬度
-                // 我們就必須允許裁切框變小
                 let targetWidth = fixedCropBoxDim.width;
                 let targetHeight = fixedCropBoxDim.height;
 
-                if (newCanvasWidth < targetWidth) {
-                    targetWidth = newCanvasWidth;
-                }
-                if (newCanvasHeight < targetHeight) {
-                    targetHeight = newCanvasHeight;
-                }
+                if (newCanvasWidth < targetWidth) { targetWidth = newCanvasWidth; }
+                if (newCanvasHeight < targetHeight) { targetHeight = newCanvasHeight; }
 
-                // 使用 setTimeout 在縮放發生的下一幀，強制重設裁切框
                 setTimeout(() => {
                     let destLeft = fixedCropBoxDim.left;
                     let destTop = fixedCropBoxDim.top;
                     
-                    // 獲取當前最新的 Canvas 數據 (Zoom 之後)
                     const currentCanvas = cropper.getCanvasData();
                     
-                    // 如果圖片縮到比框還小 (亦即框的大小被迫縮小到貼合圖片)
-                    // 這時候框的位置應該要強制跟隨圖片，不然會看起來飄在半空
-                    // 簡單判斷：如果目標寬度明顯小於原本記錄的寬度，代表進入了「圖片比框小」的狀態
-                    if (targetWidth < fixedCropBoxDim.width - 0.5) {
-                         destLeft = currentCanvas.left;
-                    }
-                    if (targetHeight < fixedCropBoxDim.height - 0.5) {
-                         destTop = currentCanvas.top;
-                    }
+                    if (targetWidth < fixedCropBoxDim.width - 0.5) { destLeft = currentCanvas.left; }
+                    if (targetHeight < fixedCropBoxDim.height - 0.5) { destTop = currentCanvas.top; }
 
-                    // 這裡不再使用「強制置中」的計算，而是直接使用 fixedCropBoxDim 的 left/top
-                    // 這樣如果你把框拖到左上角，縮放時它就會停在左上角
                     cropper.setCropBoxData({
                         width: targetWidth,
                         height: targetHeight,
@@ -582,12 +557,21 @@
             video.src = url;
             videoUI.style.display = 'flex';
             video.onloadedmetadata = () => { timeline.max = video.duration; video.currentTime = 0.1; };
+            // 核心修改：使用 replace(url, true) 來取代 initCropper
+            // 這樣在拖曳時間軸時，就不會閃爍，也不會重置裁切框位置
             video.onseeked = () => {
                 const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth; canvas.height = video.videoHeight;
                 canvas.getContext('2d').drawImage(video, 0, 0);
-                image.src = canvas.toDataURL('image/png');
-                initCropper();
+                const frameUrl = canvas.toDataURL('image/png');
+                
+                if (cropper) {
+                    // 第二個參數 true 表示保持原有的 aspect ratio 和 crop box 尺寸/位置
+                    cropper.replace(frameUrl, true);
+                } else {
+                    image.src = frameUrl;
+                    initCropper();
+                }
                 updateTimeUI();
             };
         } else {
@@ -621,12 +605,10 @@
         }
     });
 
-    // 快捷鍵 Ctrl+C 支援
     document.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
-            // 如果焦點在輸入框內，使用預設複製行為
             if (document.activeElement.tagName === 'INPUT') return;
-            e.preventDefault(); // 防止預設行為 (有時候瀏覽器會擋)
+            e.preventDefault(); 
             performCopy();
         }
     });
@@ -638,7 +620,6 @@
         if (!cropper) return;
         cropper.getCroppedCanvas().toBlob(async (blob) => {
             try {
-                // 嘗試寫入剪貼簿
                 await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
                 showToast("COPIED TO CLIPBOARD");
             } catch (err) {
@@ -667,9 +648,10 @@
     function stepFrame(frames) {
         if (!video.src) return;
         video.pause();
+        // 使用更精細的 FPS 計算，並確保不會小於 0 或大於總長度
         video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + (frames * (1/fps))));
         timeline.value = video.currentTime;
-        updateTimeUI();
+        // updateTimeUI 會在 onseeked 觸發
     }
     
     function updateTimeUI() {
