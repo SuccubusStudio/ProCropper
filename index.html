@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Cropper V8.3 - Video Master</title>
+    <title>Pro Cropper V8.6 - Screenshot Pro</title>
     <!-- Cropper.js CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
@@ -32,7 +32,34 @@
             color: var(--text);
         }
 
-        /* Dynamic Background */
+        /* 預處理遮罩 */
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(20px);
+            z-index: 10000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .loader-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        #loader-progress {
+            width: 0%;
+            height: 100%;
+            background: var(--accent);
+            box-shadow: 0 0 15px var(--accent-glow);
+            transition: width 0.1s;
+        }
+
         .mesh-bg {
             position: fixed;
             inset: -50%;
@@ -87,7 +114,6 @@
             flex-direction: column;
         }
 
-        /* Toolbar */
         .toolbar {
             position: absolute;
             top: 0; left: 0; width: 100%;
@@ -124,7 +150,6 @@
             min-height: 36px;
         }
 
-        /* Custom Select */
         .custom-select {
             position: relative;
             min-width: 140px;
@@ -168,7 +193,6 @@
         .btn-icon:hover { background: rgba(255,255,255,0.15); color: #fff; }
         .btn-icon.active { color: var(--accent); background: rgba(0, 242, 255, 0.15); border: 1px solid rgba(0, 242, 255, 0.2); }
 
-        /* Main Stage */
         .main-stage {
             position: absolute;
             inset: 0;
@@ -187,7 +211,6 @@
             justify-content: center;
             z-index: 50;
             background: rgba(0,0,0,0.2);
-            /* 防止單擊時觸發文字選取 */
             user-select: none;
         }
         #dropzone.hidden { display: none; }
@@ -210,7 +233,6 @@
         .img-container { width: 100%; height: 100%; display: none; }
         #image { max-width: 100%; max-height: 100%; display: block; }
 
-        /* Footer */
         .footer-bar {
             position: absolute;
             bottom: 0; left: 0; width: 100%;
@@ -230,13 +252,13 @@
         }
 
         .time-row { display: flex; align-items: center; gap: 20px; }
-        .time-display { font-family: monospace; font-size: 11px; color: var(--accent); min-width: 90px; letter-spacing: 1px; }
+        .frame-display { font-family: monospace; font-size: 11px; color: var(--accent); min-width: 100px; letter-spacing: 1px; font-weight: 800; }
         input[type="range"] { flex: 1; accent-color: var(--accent); cursor: pointer; height: 4px; }
 
         .frame-nav { display: flex; justify-content: center; gap: 8px; }
         .btn-frame {
             background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
-            color: var(--text); padding: 5px 12px; border-radius: 7px; font-size: 9px;
+            color: var(--text); padding: 6px 16px; border-radius: 7px; font-size: 10px;
             font-weight: 800; cursor: pointer; text-transform: uppercase;
         }
         .btn-frame:hover { border-color: var(--accent); color: #fff; background: rgba(0, 242, 255, 0.1); }
@@ -251,7 +273,6 @@
         .btn-dl { background: rgba(255,255,255,0.08); color: #fff; border: 1px solid var(--glass-border); }
         .btn-dl:hover { background: rgba(255,255,255,0.15); border-color: var(--accent); }
 
-        /* Cropper UI Customization */
         .cropper-view-box { outline: 1px solid var(--accent); }
         .cropper-point { background-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
         .cropper-face { background-color: transparent; }
@@ -262,6 +283,12 @@
 
 <div class="mesh-bg"></div>
 <div id="toast">ACTION COMPLETED</div>
+
+<div id="loading-overlay">
+    <div style="font-weight: 800; letter-spacing: 3px; font-size: 12px; color: #fff;">EXTRACTING FRAMES</div>
+    <div class="loader-bar"><div id="loader-progress"></div></div>
+    <div id="loader-text" style="font-size: 10px; opacity: 0.5;">0%</div>
+</div>
 
 <div class="app-container">
     <div id="ambient-bg"></div>
@@ -299,7 +326,7 @@
         </div>
 
         <div class="input-group">
-            <label>Pixels (W / H)</label>
+            <label>Pixels</label>
             <div class="inputs-row">
                 <input type="number" id="pxW" placeholder="W">
                 <button class="btn-icon" id="snapBtn" title="Snap to 16px Grid">
@@ -312,9 +339,18 @@
         <div class="input-group">
             <label>Transform</label>
             <div class="inputs-row">
+                <button class="btn-icon" id="fillBtn" title="Fill (Full Image Screenshot)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M7 7l10 10M17 7l-10 10"/></svg>
+                </button>
                 <button class="btn-icon" id="rotateLeft" title="Rotate Left">↺</button>
                 <button class="btn-icon" id="flipX" title="Flip Horizontal">↔</button>
-                <button class="btn-icon" id="flipY" title="Flip Vertical">↕</button>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>FPS</label>
+            <div class="inputs-row">
+                <input type="number" id="inputFPS" value="16" style="width:30px">
             </div>
         </div>
     </header>
@@ -329,63 +365,59 @@
         <div class="img-container" id="imgBox">
             <img id="image">
         </div>
-        <video id="videoSource" style="display:none;"></video>
     </main>
 
     <footer class="footer-bar">
         <div class="video-ui" id="videoUI">
             <div class="time-row">
-                <div class="time-display" id="timeDisplay">00:00.000</div>
-                <input type="range" id="timeline" step="0.001" value="0">
+                <div class="frame-display" id="frameDisplay">FRAME: 0 / 0</div>
+                <input type="range" id="frameTimeline" step="1" value="0">
             </div>
             <div class="frame-nav">
-                <!-- 移除 +/- 10 FR 按鈕，只保留逐幀 -->
+                <button class="btn-frame" onclick="stepFrame(-10)">- 10 FR</button>
                 <button class="btn-frame" onclick="stepFrame(-1)">PREV FR</button>
                 <button class="btn-frame" onclick="stepFrame(1)">NEXT FR</button>
+                <button class="btn-frame" onclick="stepFrame(10)">+ 10 FR</button>
             </div>
         </div>
         <div class="action-row">
             <button class="btn-main btn-copy" id="copyBtn">Copy to Clipboard</button>
             <button class="btn-main btn-dl" id="dlBtn">Save Image</button>
-            <input type="file" id="fileInput" hidden accept="image/*,video/mp4,video/quicktime">
+            <input type="file" id="fileInput" hidden accept="image/*,video/mp4,video/quicktime,video/webm">
         </div>
     </footer>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 <script>
-    const video = document.getElementById('videoSource'), 
-          image = document.getElementById('image'),
+    const image = document.getElementById('image'),
           imgBox = document.getElementById('imgBox'), 
           videoUI = document.getElementById('videoUI'),
           ambientBg = document.getElementById('ambient-bg'),
-          timeline = document.getElementById('timeline'),
-          timeDisplay = document.getElementById('timeDisplay'),
+          frameTimeline = document.getElementById('frameTimeline'),
+          frameDisplay = document.getElementById('frameDisplay'),
           dropzone = document.getElementById('dropzone'), 
           fileInput = document.getElementById('fileInput'),
           pxW = document.getElementById('pxW'), pxH = document.getElementById('pxH'),
           aspW = document.getElementById('aspW'), aspH = document.getElementById('aspH'),
           lockBtn = document.getElementById('lockBtn'), 
-          swapBtn = document.getElementById('swapBtn'),
           snapBtn = document.getElementById('snapBtn'),
-          ratioSelect = document.getElementById('ratioSelect'),
-          selectValue = document.getElementById('selectValue');
+          inputFPS = document.getElementById('inputFPS'),
+          loadingOverlay = document.getElementById('loading-overlay'),
+          loaderProgress = document.getElementById('loader-progress'),
+          loaderText = document.getElementById('loader-text'),
+          fillBtn = document.getElementById('fillBtn');
 
     let cropper, isSnap16 = false, isRatioLocked = true;
+    let extractedFrames = []; 
+    let currentFrameIndex = 0;
     let isInternalUpdate = false;
-    // 記錄最後一次合法的螢幕裁切框大小 (寬度/高度)
-    let fixedCropBoxDim = null; 
-    
-    // 將 FPS 設定為 60，讓步進更細緻，解決「不是真正逐幀」的感覺
-    const fps = 60;
 
     // --- Core Interaction Logic ---
 
     [aspW, aspH].forEach(input => {
         input.addEventListener('input', () => {
             if (!cropper) return;
-            selectValue.innerText = "CUSTOM";
-            document.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
             isRatioLocked = true;
             lockBtn.classList.add('active');
             updateCropperRatio();
@@ -397,92 +429,53 @@
             if (!cropper || isInternalUpdate) return;
             isRatioLocked = false;
             lockBtn.classList.remove('active');
-            selectValue.innerText = "FREE FORM";
             updateCropperRatio();
             const data = cropper.getData();
             cropper.setData({
                 width: parseFloat(pxW.value) || data.width,
                 height: parseFloat(pxH.value) || data.height
             });
-            setTimeout(recordCropBoxDim, 100);
         });
     });
 
-    // --- UI Event Handlers ---
+    document.getElementById('ratioSelect').onclick = (e) => {
+        document.getElementById('ratioSelect').classList.toggle('open');
+        e.stopPropagation();
+    };
 
-    ratioSelect.onclick = (e) => { ratioSelect.classList.toggle('open'); e.stopPropagation(); };
     document.querySelectorAll('.option').forEach(option => {
         option.onclick = function() {
             const val = this.getAttribute('data-value');
-            selectValue.innerText = this.innerText;
-            document.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
-            this.classList.add('selected');
-            if (val === "custom") {
-                isRatioLocked = false; lockBtn.classList.remove('active');
-            } else {
+            document.getElementById('selectValue').innerText = this.innerText;
+            if (val !== "custom") {
                 const [w, h] = val.split(':').map(Number);
                 aspW.value = w; aspH.value = h;
                 isRatioLocked = true; lockBtn.classList.add('active');
+            } else {
+                isRatioLocked = false; lockBtn.classList.remove('active');
             }
             updateCropperRatio();
         };
     });
-    window.onclick = () => ratioSelect.classList.remove('open');
-
-    swapBtn.onclick = () => {
-        const temp = aspW.value;
-        aspW.value = aspH.value;
-        aspH.value = temp;
-        selectValue.innerText = "CUSTOM";
-        document.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
-        updateCropperRatio();
-    };
 
     function updateCropperRatio() {
         if (cropper) {
             cropper.setAspectRatio(isRatioLocked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN);
-            setTimeout(recordCropBoxDim, 100);
         }
     }
 
-    function recordCropBoxDim() {
-        if (cropper) {
-            fixedCropBoxDim = cropper.getCropBoxData();
-        }
-    }
-
-    function initCropper() {
+    function initCropper(sourceUrl) {
         if(cropper) cropper.destroy();
+        image.src = sourceUrl;
         
         cropper = new Cropper(image, {
             viewMode: 1, 
             dragMode: 'move', 
-            cropBoxMovable: true, 
-            cropBoxResizable: true, 
-            toggleDragModeOnDblclick: false, 
-            autoCropArea: 0.65,
-            center: true, 
-            background: false, 
+            autoCropArea: 0.8,
+            background: false,
             responsive: true,
-            restore: false,
-            
-            ready() {
-                const containerData = cropper.getContainerData();
-                const toolbarH = document.querySelector('.toolbar').offsetHeight;
-                const footerH = document.querySelector('.footer-bar').offsetHeight;
-                const visibleHeight = containerData.height - toolbarH - footerH;
-                const canvasData = cropper.getCanvasData();
-                
-                if (canvasData.height < visibleHeight) {
-                    cropper.zoomTo(visibleHeight / canvasData.naturalHeight);
-                }
-                
-                recordCropBoxDim();
-            },
-            
             aspectRatio: isRatioLocked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN,
-            
-            crop(e) { 
+            crop(e) {
                 if (document.activeElement !== pxW && document.activeElement !== pxH) {
                     isInternalUpdate = true;
                     pxW.value = Math.round(e.detail.width); 
@@ -490,48 +483,113 @@
                     isInternalUpdate = false;
                 }
             },
-            
             cropend() {
                 if (isSnap16) applySnap16();
-                recordCropBoxDim();
-            },
-
-            zoom(e) {
-                if (!fixedCropBoxDim) return;
-
-                const newRatio = e.detail.ratio;
-                const naturalWidth = cropper.getImageData().naturalWidth;
-                const naturalHeight = cropper.getImageData().naturalHeight;
-                const newCanvasWidth = naturalWidth * newRatio;
-                const newCanvasHeight = naturalHeight * newRatio;
-
-                let targetWidth = fixedCropBoxDim.width;
-                let targetHeight = fixedCropBoxDim.height;
-
-                if (newCanvasWidth < targetWidth) { targetWidth = newCanvasWidth; }
-                if (newCanvasHeight < targetHeight) { targetHeight = newCanvasHeight; }
-
-                setTimeout(() => {
-                    let destLeft = fixedCropBoxDim.left;
-                    let destTop = fixedCropBoxDim.top;
-                    
-                    const currentCanvas = cropper.getCanvasData();
-                    
-                    if (targetWidth < fixedCropBoxDim.width - 0.5) { destLeft = currentCanvas.left; }
-                    if (targetHeight < fixedCropBoxDim.height - 0.5) { destTop = currentCanvas.top; }
-
-                    cropper.setCropBoxData({
-                        width: targetWidth,
-                        height: targetHeight,
-                        left: destLeft,
-                        top: destTop
-                    });
-                }, 0);
             }
         });
     }
 
-    window.addEventListener('resize', () => { if (cropper) cropper.resize(); });
+    async function handleFile(file) {
+        if (!file) return;
+        
+        extractedFrames.forEach(url => URL.revokeObjectURL(url));
+        extractedFrames = [];
+        currentFrameIndex = 0;
+
+        if (file.type.startsWith('video/')) {
+            loadingOverlay.style.display = 'flex';
+            await extractFramesFromVideo(file);
+            loadingOverlay.style.display = 'none';
+            
+            if (extractedFrames.length > 0) {
+                videoUI.style.display = 'flex';
+                imgBox.style.display = 'block';
+                dropzone.classList.add('hidden');
+                
+                frameTimeline.max = extractedFrames.length - 1;
+                frameTimeline.value = 0;
+                updateFrameUI();
+                initCropper(extractedFrames[0]);
+                
+                ambientBg.style.backgroundImage = `url(${extractedFrames[0]})`;
+                ambientBg.style.opacity = "0.3";
+            }
+        } else {
+            videoUI.style.display = 'none';
+            const url = URL.createObjectURL(file);
+            imgBox.style.display = 'block';
+            dropzone.classList.add('hidden');
+            initCropper(url);
+            ambientBg.style.backgroundImage = `url(${url})`;
+            ambientBg.style.opacity = "0.3";
+        }
+    }
+
+    async function extractFramesFromVideo(file) {
+        return new Promise((resolve) => {
+            const video = document.createElement('video');
+            video.src = URL.createObjectURL(file);
+            video.muted = true;
+            video.playsInline = true;
+
+            video.onloadedmetadata = async () => {
+                const fps = parseFloat(inputFPS.value) || 16;
+                const duration = video.duration;
+                const totalFrames = Math.floor(duration * fps);
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+
+                for (let i = 0; i < totalFrames; i++) {
+                    const time = i / fps;
+                    video.currentTime = time;
+                    
+                    await new Promise(r => {
+                        const onSeeked = () => {
+                            video.removeEventListener('seeked', onSeeked);
+                            r();
+                        };
+                        video.addEventListener('seeked', onSeeked);
+                    });
+
+                    ctx.drawImage(video, 0, 0);
+                    
+                    await new Promise(r => {
+                        canvas.toBlob(blob => {
+                            const url = URL.createObjectURL(blob);
+                            extractedFrames.push(url);
+                            const progress = Math.round((i / totalFrames) * 100);
+                            loaderProgress.style.width = progress + '%';
+                            loaderText.innerText = progress + '%';
+                            r();
+                        }, 'image/jpeg', 0.9);
+                    });
+                }
+                URL.revokeObjectURL(video.src);
+                resolve();
+            };
+        });
+    }
+
+    function stepFrame(dir) {
+        if (extractedFrames.length === 0) return;
+        currentFrameIndex = Math.max(0, Math.min(extractedFrames.length - 1, currentFrameIndex + dir));
+        frameTimeline.value = currentFrameIndex;
+        updateFrameUI();
+        if (cropper) cropper.replace(extractedFrames[currentFrameIndex], true);
+    }
+
+    function updateFrameUI() {
+        frameDisplay.innerText = `FRAME: ${currentFrameIndex + 1} / ${extractedFrames.length}`;
+    }
+
+    frameTimeline.oninput = () => {
+        currentFrameIndex = parseInt(frameTimeline.value);
+        updateFrameUI();
+        if (cropper) cropper.replace(extractedFrames[currentFrameIndex], true);
+    };
 
     function applySnap16() {
         if (!cropper) return;
@@ -543,49 +601,9 @@
         cropper.setData({ width: newW, height: newH });
     }
 
-    // --- File Handling & Utilities ---
-
-    function handleFile(file) {
-        if (!file) return;
-        const url = URL.createObjectURL(file);
-        ambientBg.style.backgroundImage = `url(${url})`;
-        ambientBg.style.opacity = "0.45";
-        dropzone.classList.add('hidden');
-        imgBox.style.display = 'block';
-
-        if (file.type.startsWith('video/')) {
-            video.src = url;
-            videoUI.style.display = 'flex';
-            video.onloadedmetadata = () => { timeline.max = video.duration; video.currentTime = 0.1; };
-            // 核心修改：使用 replace(url, true) 來取代 initCropper
-            // 這樣在拖曳時間軸時，就不會閃爍，也不會重置裁切框位置
-            video.onseeked = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0);
-                const frameUrl = canvas.toDataURL('image/png');
-                
-                if (cropper) {
-                    // 第二個參數 true 表示保持原有的 aspect ratio 和 crop box 尺寸/位置
-                    cropper.replace(frameUrl, true);
-                } else {
-                    image.src = frameUrl;
-                    initCropper();
-                }
-                updateTimeUI();
-            };
-        } else {
-            videoUI.style.display = 'none';
-            image.src = url;
-            setTimeout(initCropper, 100);
-        }
-    }
-
     lockBtn.onclick = () => {
         isRatioLocked = !isRatioLocked;
         lockBtn.classList.toggle('active', isRatioLocked);
-        if (!isRatioLocked) selectValue.innerText = "FREE FORM";
-        else selectValue.innerText = "CUSTOM";
         updateCropperRatio();
     };
 
@@ -595,26 +613,24 @@
         if (isSnap16) applySnap16();
     };
 
+    fillBtn.onclick = () => {
+        if (!cropper) return;
+        isRatioLocked = false;
+        lockBtn.classList.remove('active');
+        document.getElementById('selectValue').innerText = "FREE FORM";
+        updateCropperRatio();
+        const imageData = cropper.getImageData();
+        cropper.setData({
+            x: 0,
+            y: 0,
+            width: imageData.naturalWidth,
+            height: imageData.naturalHeight
+        });
+        showToast("FILLED TO CANVAS");
+    };
+
     document.getElementById('rotateLeft').onclick = () => cropper?.rotate(-90);
     document.getElementById('flipX').onclick = () => cropper?.scaleX(cropper.getData().scaleX * -1);
-    document.getElementById('flipY').onclick = () => cropper?.scaleY(cropper.getData().scaleY * -1);
-
-    window.addEventListener('paste', (e) => {
-        for (let item of e.clipboardData.items) {
-            if (item.type.includes('image') || item.type.includes('video')) { handleFile(item.getAsFile()); break; }
-        }
-    });
-
-    document.addEventListener('keydown', (e) => {
-        if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
-            if (document.activeElement.tagName === 'INPUT') return;
-            e.preventDefault(); 
-            performCopy();
-        }
-    });
-
-    dropzone.ondblclick = () => fileInput.click();
-    fileInput.onchange = (e) => handleFile(e.target.files[0]);
 
     async function performCopy() {
         if (!cropper) return;
@@ -622,10 +638,7 @@
             try {
                 await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
                 showToast("COPIED TO CLIPBOARD");
-            } catch (err) {
-                console.error(err);
-                showToast("Use Button to Copy"); 
-            }
+            } catch (err) { showToast("COPY FAILED"); }
         });
     }
 
@@ -633,7 +646,7 @@
     document.getElementById('dlBtn').onclick = () => {
         if (!cropper) return;
         const link = document.createElement('a');
-        link.download = `crop_${Date.now()}.png`;
+        link.download = `crop_frame_${currentFrameIndex + 1}.png`;
         link.href = cropper.getCroppedCanvas().toDataURL();
         link.click();
         showToast("IMAGE SAVED");
@@ -642,25 +655,35 @@
     function showToast(msg) {
         const t = document.getElementById('toast');
         t.innerText = msg; t.style.display = 'block'; 
-        setTimeout(() => t.style.display='none', 2500);
+        setTimeout(() => t.style.display='none', 2000);
     }
 
-    function stepFrame(frames) {
-        if (!video.src) return;
-        video.pause();
-        // 使用更精細的 FPS 計算，並確保不會小於 0 或大於總長度
-        video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + (frames * (1/fps))));
-        timeline.value = video.currentTime;
-        // updateTimeUI 會在 onseeked 觸發
-    }
-    
-    function updateTimeUI() {
-        const date = new Date(0);
-        date.setSeconds(video.currentTime);
-        const ms = Math.floor((video.currentTime % 1) * 1000).toString().padStart(3, '0');
-        timeDisplay.innerText = date.toISOString().substr(14, 5) + '.' + ms;
-    }
-    timeline.oninput = () => { video.currentTime = timeline.value; updateTimeUI(); };
+    dropzone.ondblclick = () => fileInput.click();
+    fileInput.onchange = (e) => handleFile(e.target.files[0]);
+    window.addEventListener('paste', (e) => {
+        for (let item of e.clipboardData.items) {
+            if (item.type.includes('image') || item.type.includes('video')) {
+                handleFile(item.getAsFile()); break;
+            }
+        }
+    });
+
+    // 全域鍵盤監聽 - 修復 Ctrl+C 並整合換幀
+    document.addEventListener('keydown', (e) => {
+        // 判斷是否按下 Ctrl/Cmd + C
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+            if (document.activeElement.tagName === 'INPUT') return;
+            e.preventDefault();
+            performCopy();
+            return;
+        }
+
+        // 影片換幀
+        if (videoUI.style.display === 'flex') {
+            if (e.key === 'ArrowRight') stepFrame(1);
+            if (e.key === 'ArrowLeft') stepFrame(-1);
+        }
+    });
 </script>
 </body>
 </html>
