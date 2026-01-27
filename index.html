@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Cropper V8.6 - Screenshot Pro</title>
-    <!-- Cropper.js CSS -->
+    <title>Pro Cropper V8.7 - Screenshot Pro</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
@@ -402,6 +401,7 @@
           aspW = document.getElementById('aspW'), aspH = document.getElementById('aspH'),
           lockBtn = document.getElementById('lockBtn'), 
           snapBtn = document.getElementById('snapBtn'),
+          swapBtn = document.getElementById('swapBtn'),
           inputFPS = document.getElementById('inputFPS'),
           loadingOverlay = document.getElementById('loading-overlay'),
           loaderProgress = document.getElementById('loader-progress'),
@@ -414,6 +414,17 @@
     let isInternalUpdate = false;
 
     // --- Core Interaction Logic ---
+
+    swapBtn.onclick = () => {
+        const temp = aspW.value;
+        aspW.value = aspH.value;
+        aspH.value = temp;
+        
+        isRatioLocked = true;
+        lockBtn.classList.add('active');
+        updateCropperRatio();
+        document.getElementById('selectValue').innerText = "CUSTOM SWAP";
+    };
 
     [aspW, aspH].forEach(input => {
         input.addEventListener('input', () => {
@@ -469,11 +480,12 @@
         image.src = sourceUrl;
         
         cropper = new Cropper(image, {
-            viewMode: 1, 
+            viewMode: 0, 
             dragMode: 'move', 
             autoCropArea: 0.8,
             background: false,
             responsive: true,
+            restore: false,
             aspectRatio: isRatioLocked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN,
             crop(e) {
                 if (document.activeElement !== pxW && document.activeElement !== pxH) {
@@ -668,9 +680,7 @@
         }
     });
 
-    // 全域鍵盤監聽 - 修復 Ctrl+C 並整合換幀
     document.addEventListener('keydown', (e) => {
-        // 判斷是否按下 Ctrl/Cmd + C
         if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
             if (document.activeElement.tagName === 'INPUT') return;
             e.preventDefault();
@@ -678,7 +688,6 @@
             return;
         }
 
-        // 影片換幀
         if (videoUI.style.display === 'flex') {
             if (e.key === 'ArrowRight') stepFrame(1);
             if (e.key === 'ArrowLeft') stepFrame(-1);
