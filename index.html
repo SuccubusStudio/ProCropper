@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Cropper V8.7 - Screenshot Pro</title>
+    <title>Pro Cropper V9.0 - Safe View</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
@@ -157,7 +157,12 @@
             font-weight: 600;
             color: var(--accent);
         }
-        .select-trigger { display: flex; justify-content: space-between; align-items: center; }
+        
+        .custom-select.mini {
+            min-width: 80px;
+        }
+
+        .select-trigger { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
         .select-trigger:after {
             content: ''; border: solid var(--accent); border-width: 0 1.5px 1.5px 0;
             display: inline-block; padding: 3px; transform: rotate(45deg);
@@ -174,9 +179,11 @@
             display: none;
             z-index: 200;
             padding: 8px 0;
+            max-height: 300px;
+            overflow-y: auto;
         }
         .custom-select.open .select-options { display: block; }
-        .option { padding: 8px 20px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .option { padding: 8px 20px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text); }
         .option:hover { background: rgba(0, 242, 255, 0.1); color: var(--accent); }
         .option.selected { color: var(--accent); font-weight: 800; }
 
@@ -325,12 +332,22 @@
         </div>
 
         <div class="input-group">
-            <label>Pixels</label>
+            <label>Grid Snapping</label>
             <div class="inputs-row">
                 <input type="number" id="pxW" placeholder="W">
-                <button class="btn-icon" id="snapBtn" title="Snap to 16px Grid">
-                    <span style="font-size:9px;font-weight:900">16</span>
-                </button>
+                
+                <!-- 網格選擇器 -->
+                <div class="custom-select mini" id="gridSelect">
+                    <div class="select-trigger" id="gridSelectValue">16PX</div>
+                    <div class="select-options">
+                        <div class="option" data-grid="0">OFF</div>
+                        <div class="option" data-grid="16">16PX</div>
+                        <div class="option" data-grid="32">32PX</div>
+                        <div class="option" data-grid="64">64PX</div>
+                        <div class="option" data-grid="128">128PX</div>
+                    </div>
+                </div>
+
                 <input type="number" id="pxH" placeholder="H">
             </div>
         </div>
@@ -400,7 +417,6 @@
           pxW = document.getElementById('pxW'), pxH = document.getElementById('pxH'),
           aspW = document.getElementById('aspW'), aspH = document.getElementById('aspH'),
           lockBtn = document.getElementById('lockBtn'), 
-          snapBtn = document.getElementById('snapBtn'),
           swapBtn = document.getElementById('swapBtn'),
           inputFPS = document.getElementById('inputFPS'),
           loadingOverlay = document.getElementById('loading-overlay'),
@@ -408,12 +424,19 @@
           loaderText = document.getElementById('loader-text'),
           fillBtn = document.getElementById('fillBtn');
 
-    let cropper, isSnap16 = false, isRatioLocked = true;
+    let cropper, currentGridSize = 16, isRatioLocked = true;
     let extractedFrames = []; 
     let currentFrameIndex = 0;
     let isInternalUpdate = false;
+    
+    // 拖曳鎖定相關變數
+    let lastPointerX = 0;
+    let lastPointerY = 0;
 
     // --- Core Interaction Logic ---
+
+    // 初始化預設值
+    document.getElementById('gridSelectValue').innerText = "16PX";
 
     swapBtn.onclick = () => {
         const temp = aspW.value;
@@ -449,15 +472,22 @@
         });
     });
 
+    // 處理 Aspect Ratio 下拉選單
     document.getElementById('ratioSelect').onclick = (e) => {
         document.getElementById('ratioSelect').classList.toggle('open');
+        document.getElementById('gridSelect').classList.remove('open'); // 關閉另一個
         e.stopPropagation();
     };
 
-    document.querySelectorAll('.option').forEach(option => {
+    document.querySelectorAll('#ratioSelect .option').forEach(option => {
         option.onclick = function() {
             const val = this.getAttribute('data-value');
             document.getElementById('selectValue').innerText = this.innerText;
+            
+            // UI Selected state
+            document.querySelectorAll('#ratioSelect .option').forEach(o => o.classList.remove('selected'));
+            this.classList.add('selected');
+
             if (val !== "custom") {
                 const [w, h] = val.split(':').map(Number);
                 aspW.value = w; aspH.value = h;
@@ -469,24 +499,111 @@
         };
     });
 
+    // 處理 Grid 下拉選單
+    document.getElementById('gridSelect').onclick = (e) => {
+        document.getElementById('gridSelect').classList.toggle('open');
+        document.getElementById('ratioSelect').classList.remove('open'); // 關閉另一個
+        e.stopPropagation();
+    };
+
+    document.querySelectorAll('#gridSelect .option').forEach(option => {
+        option.onclick = function() {
+            const val = parseInt(this.getAttribute('data-grid'));
+            currentGridSize = val;
+            
+            document.getElementById('gridSelectValue').innerText = this.innerText;
+            
+            // UI Selected state
+            document.querySelectorAll('#gridSelect .option').forEach(o => o.classList.remove('selected'));
+            this.classList.add('selected');
+
+            // 立即應用一次對齊
+            if (currentGridSize > 0) applyGridSnap();
+        };
+    });
+
+    // 點擊空白處關閉選單
+    window.addEventListener('click', () => {
+        document.querySelectorAll('.custom-select').forEach(el => el.classList.remove('open'));
+    });
+
     function updateCropperRatio() {
         if (cropper) {
             cropper.setAspectRatio(isRatioLocked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN);
         }
     }
 
+    function getPointer(e) {
+        if (e.touches && e.touches.length > 0) {
+            return { x: e.touches[0].pageX, y: e.touches[0].pageY };
+        }
+        return { x: e.pageX, y: e.pageY };
+    }
+
     function initCropper(sourceUrl) {
         if(cropper) cropper.destroy();
         image.src = sourceUrl;
         
+        // 標記：是否為首次載入（用於控制自動縮放，避免切換 Frame 時一直縮放）
+        let isFirstReady = true;
+
         cropper = new Cropper(image, {
-            viewMode: 0, 
+            viewMode: 1, 
             dragMode: 'move', 
             autoCropArea: 0.8,
             background: false,
             responsive: true,
             restore: false,
             aspectRatio: isRatioLocked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN,
+            
+            ready() {
+                // --- 智能縮放邏輯：載入時自動縮小至 60% 並居中 (V9.0 Update) ---
+                if (isFirstReady) {
+                    const containerData = this.cropper.getContainerData();
+                    const canvasData = this.cropper.getCanvasData();
+
+                    // 使用 0.6 (60%) 確保四周留有足夠的安全邊距
+                    const newWidth = canvasData.width * 0.6;
+                    const newHeight = canvasData.height * 0.6;
+
+                    // 計算居中位置
+                    const newLeft = (containerData.width - newWidth) / 2;
+                    const newTop = (containerData.height - newHeight) / 2;
+
+                    this.cropper.setCanvasData({
+                        width: newWidth,
+                        height: newHeight,
+                        left: newLeft,
+                        top: newTop
+                    });
+                    
+                    // 標記已完成初始化縮放
+                    isFirstReady = false;
+                }
+            },
+
+            cropstart(e) {
+                const ptr = getPointer(e.detail.originalEvent);
+                lastPointerX = ptr.x;
+                lastPointerY = ptr.y;
+            },
+
+            cropmove(e) {
+                // --- Step Dragging ---
+                if (currentGridSize > 0) {
+                    const ptr = getPointer(e.detail.originalEvent);
+                    const dx = Math.abs(ptr.x - lastPointerX);
+                    const dy = Math.abs(ptr.y - lastPointerY);
+
+                    if (dx < currentGridSize && dy < currentGridSize) {
+                        e.preventDefault(); 
+                    } else {
+                        if (dx >= currentGridSize) lastPointerX = ptr.x;
+                        if (dy >= currentGridSize) lastPointerY = ptr.y;
+                    }
+                }
+            },
+
             crop(e) {
                 if (document.activeElement !== pxW && document.activeElement !== pxH) {
                     isInternalUpdate = true;
@@ -496,7 +613,7 @@
                 }
             },
             cropend() {
-                if (isSnap16) applySnap16();
+                if (currentGridSize > 0) applyGridSnap();
             }
         });
     }
@@ -603,26 +720,29 @@
         if (cropper) cropper.replace(extractedFrames[currentFrameIndex], true);
     };
 
-    function applySnap16() {
-        if (!cropper) return;
+    function applyGridSnap() {
+        if (!cropper || currentGridSize === 0) return;
         const data = cropper.getData();
-        let newW = Math.round(data.width / 16) * 16;
+        
+        let newW = Math.round(data.width / currentGridSize) * currentGridSize;
+        let newX = Math.round(data.x / currentGridSize) * currentGridSize;
+        let newY = Math.round(data.y / currentGridSize) * currentGridSize;
+        
         let newH = isRatioLocked 
-            ? Math.round((newW / (parseFloat(aspW.value)/parseFloat(aspH.value))) / 16) * 16 
-            : Math.round(data.height / 16) * 16;
-        cropper.setData({ width: newW, height: newH });
+            ? Math.round((newW / (parseFloat(aspW.value)/parseFloat(aspH.value))) / currentGridSize) * currentGridSize 
+            : Math.round(data.height / currentGridSize) * currentGridSize;
+            
+        if (isRatioLocked) {
+             newH = newW / (parseFloat(aspW.value)/parseFloat(aspH.value));
+        }
+
+        cropper.setData({ x: newX, y: newY, width: newW, height: newH });
     }
 
     lockBtn.onclick = () => {
         isRatioLocked = !isRatioLocked;
         lockBtn.classList.toggle('active', isRatioLocked);
         updateCropperRatio();
-    };
-
-    snapBtn.onclick = () => {
-        isSnap16 = !isSnap16;
-        snapBtn.classList.toggle('active', isSnap16);
-        if (isSnap16) applySnap16();
     };
 
     fillBtn.onclick = () => {
