@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pro Cropper V9.0 - Safe View</title>
+    <title>Pro Cropper V9.5 - Safe View</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
@@ -31,7 +31,7 @@
             color: var(--text);
         }
 
-        /* 預處理遮罩 */
+        /* 预处理遮罩 */
         #loading-overlay {
             position: fixed;
             inset: 0;
@@ -336,7 +336,6 @@
             <div class="inputs-row">
                 <input type="number" id="pxW" placeholder="W">
                 
-                <!-- 網格選擇器 -->
                 <div class="custom-select mini" id="gridSelect">
                     <div class="select-trigger" id="gridSelectValue">16PX</div>
                     <div class="select-options">
@@ -429,13 +428,15 @@
     let currentFrameIndex = 0;
     let isInternalUpdate = false;
     
-    // 拖曳鎖定相關變數
+    // 拖曳锁定与连动相关变数
     let lastPointerX = 0;
     let lastPointerY = 0;
+    let isPanning = false;
+    let panStartPointer = { x: 0, y: 0 };
+    let panStartCanvas = null;
+    let panLockData = null;
 
-    // --- Core Interaction Logic ---
-
-    // 初始化預設值
+    // 初始化预设值
     document.getElementById('gridSelectValue').innerText = "16PX";
 
     swapBtn.onclick = () => {
@@ -472,10 +473,9 @@
         });
     });
 
-    // 處理 Aspect Ratio 下拉選單
     document.getElementById('ratioSelect').onclick = (e) => {
         document.getElementById('ratioSelect').classList.toggle('open');
-        document.getElementById('gridSelect').classList.remove('open'); // 關閉另一個
+        document.getElementById('gridSelect').classList.remove('open');
         e.stopPropagation();
     };
 
@@ -484,7 +484,6 @@
             const val = this.getAttribute('data-value');
             document.getElementById('selectValue').innerText = this.innerText;
             
-            // UI Selected state
             document.querySelectorAll('#ratioSelect .option').forEach(o => o.classList.remove('selected'));
             this.classList.add('selected');
 
@@ -499,10 +498,9 @@
         };
     });
 
-    // 處理 Grid 下拉選單
     document.getElementById('gridSelect').onclick = (e) => {
         document.getElementById('gridSelect').classList.toggle('open');
-        document.getElementById('ratioSelect').classList.remove('open'); // 關閉另一個
+        document.getElementById('ratioSelect').classList.remove('open');
         e.stopPropagation();
     };
 
@@ -513,16 +511,13 @@
             
             document.getElementById('gridSelectValue').innerText = this.innerText;
             
-            // UI Selected state
             document.querySelectorAll('#gridSelect .option').forEach(o => o.classList.remove('selected'));
             this.classList.add('selected');
 
-            // 立即應用一次對齊
             if (currentGridSize > 0) applyGridSnap();
         };
     });
 
-    // 點擊空白處關閉選單
     window.addEventListener('click', () => {
         document.querySelectorAll('.custom-select').forEach(el => el.classList.remove('open'));
     });
@@ -544,7 +539,6 @@
         if(cropper) cropper.destroy();
         image.src = sourceUrl;
         
-        // 標記：是否為首次載入（用於控制自動縮放，避免切換 Frame 時一直縮放）
         let isFirstReady = true;
 
         cropper = new Cropper(image, {
@@ -554,21 +548,34 @@
             background: false,
             responsive: true,
             restore: false,
+            zoomable: false,       
+            zoomOnWheel: false,    
+            zoomOnTouch: false,    
+
             aspectRatio: isRatioLocked ? parseFloat(aspW.value)/parseFloat(aspH.value) : NaN,
             
             ready() {
-                // --- 智能縮放邏輯：載入時自動縮小至 60% 並居中 (V9.0 Update) ---
                 if (isFirstReady) {
                     const containerData = this.cropper.getContainerData();
-                    const canvasData = this.cropper.getCanvasData();
+                    const imageData = this.cropper.getImageData();
 
-                    // 使用 0.6 (60%) 確保四周留有足夠的安全邊距
-                    const newWidth = canvasData.width * 0.6;
-                    const newHeight = canvasData.height * 0.6;
+                    const headerH = document.querySelector('.toolbar').offsetHeight || 70;
+                    const footerH = document.querySelector('.footer-bar').offsetHeight || 80;
 
-                    // 計算居中位置
+                    const padding = 40;
+                    const safeWidth = containerData.width - padding * 2;
+                    const safeHeight = containerData.height - headerH - footerH - padding * 2;
+
+                    const scaleX = safeWidth / imageData.naturalWidth;
+                    const scaleY = safeHeight / imageData.naturalHeight;
+                    const minScale = Math.min(scaleX, scaleY);
+
+                    const newWidth = imageData.naturalWidth * minScale;
+                    const newHeight = imageData.naturalHeight * minScale;
                     const newLeft = (containerData.width - newWidth) / 2;
-                    const newTop = (containerData.height - newHeight) / 2;
+                    const newTop = headerH + padding + (safeHeight - newHeight) / 2;
+
+                    this.cropper.setCropBoxData({ width: 2, height: 2 });
 
                     this.cropper.setCanvasData({
                         width: newWidth,
@@ -576,8 +583,26 @@
                         left: newLeft,
                         top: newTop
                     });
-                    
-                    // 標記已完成初始化縮放
+
+                    let targetRatio = isRatioLocked ? (parseFloat(aspW.value) / parseFloat(aspH.value)) : NaN;
+                    let cropW = newWidth * 0.9;
+                    let cropH = newHeight * 0.9;
+
+                    if (!isNaN(targetRatio)) {
+                        if (cropW / targetRatio <= cropH) {
+                            cropH = cropW / targetRatio;
+                        } else {
+                            cropW = cropH * targetRatio;
+                        }
+                    }
+
+                    this.cropper.setCropBoxData({
+                        width: cropW,
+                        height: cropH,
+                        left: newLeft + (newWidth - cropW) / 2,
+                        top: newTop + (newHeight - cropH) / 2
+                    });
+
                     isFirstReady = false;
                 }
             },
@@ -586,12 +611,34 @@
                 const ptr = getPointer(e.detail.originalEvent);
                 lastPointerX = ptr.x;
                 lastPointerY = ptr.y;
+
+                if (e.detail.action === 'move') {
+                    isPanning = true;
+                    panStartPointer = { x: ptr.x, y: ptr.y };
+                    panStartCanvas = this.cropper.getCanvasData();
+                    panLockData = this.cropper.getData();
+                }
             },
 
             cropmove(e) {
-                // --- Step Dragging ---
-                if (currentGridSize > 0) {
-                    const ptr = getPointer(e.detail.originalEvent);
+                const ptr = getPointer(e.detail.originalEvent);
+
+                if (e.detail.action === 'move' && isPanning) {
+                    e.preventDefault();
+                    
+                    const dx = ptr.x - panStartPointer.x;
+                    const dy = ptr.y - panStartPointer.y;
+
+                    this.cropper.setCanvasData({
+                        left: panStartCanvas.left + dx,
+                        top: panStartCanvas.top + dy
+                    });
+                    
+                    this.cropper.setData(panLockData);
+                    return;
+                }
+
+                if (currentGridSize > 0 && e.detail.action !== 'all' && e.detail.action !== 'move') {
                     const dx = Math.abs(ptr.x - lastPointerX);
                     const dy = Math.abs(ptr.y - lastPointerY);
 
@@ -612,11 +659,52 @@
                     isInternalUpdate = false;
                 }
             },
-            cropend() {
+            
+            cropend(e) {
+                if (e.detail.action === 'move') {
+                    isPanning = false;
+                }
                 if (currentGridSize > 0) applyGridSnap();
             }
         });
     }
+
+    imgBox.addEventListener('wheel', (e) => {
+        if (!cropper) return;
+        e.preventDefault(); 
+
+        const zoomIn = e.deltaY < 0;
+        const factor = zoomIn ? 1.25 : 0.8;
+
+        const canvasData = cropper.getCanvasData();
+        const newWidth = canvasData.width * factor;
+        const newHeight = canvasData.height * factor;
+
+        if (newWidth < 50 || newWidth > 20000) return;
+
+        const lockedCropData = cropper.getData();
+
+        const rect = imgBox.getBoundingClientRect();
+        const pointerX = e.clientX - rect.left;
+        const pointerY = e.clientY - rect.top;
+
+        const canvasRelativeX = pointerX - canvasData.left;
+        const canvasRelativeY = pointerY - canvasData.top;
+
+        const newLeft = pointerX - canvasRelativeX * factor;
+        const newTop = pointerY - canvasRelativeY * factor;
+
+        cropper.setCanvasData({
+            width: newWidth,
+            height: newHeight,
+            left: newLeft,
+            top: newTop
+        });
+
+        cropper.setData(lockedCropData);
+        
+    }, { passive: false });
+
 
     async function handleFile(file) {
         if (!file) return;
@@ -725,8 +813,6 @@
         const data = cropper.getData();
         
         let newW = Math.round(data.width / currentGridSize) * currentGridSize;
-        let newX = Math.round(data.x / currentGridSize) * currentGridSize;
-        let newY = Math.round(data.y / currentGridSize) * currentGridSize;
         
         let newH = isRatioLocked 
             ? Math.round((newW / (parseFloat(aspW.value)/parseFloat(aspH.value))) / currentGridSize) * currentGridSize 
@@ -736,7 +822,7 @@
              newH = newW / (parseFloat(aspW.value)/parseFloat(aspH.value));
         }
 
-        cropper.setData({ x: newX, y: newY, width: newW, height: newH });
+        cropper.setData({ x: data.x, y: data.y, width: newW, height: newH });
     }
 
     lockBtn.onclick = () => {
@@ -802,7 +888,8 @@
 
     document.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
-            if (document.activeElement.tagName === 'INPUT') return;
+            // 放宽限制：只在实际输入文字/数字的输入框才阻挡，避免挡到 type="range" (时间轴滑杆)
+            if (document.activeElement.tagName === 'INPUT' && document.activeElement.type !== 'range') return;
             e.preventDefault();
             performCopy();
             return;
